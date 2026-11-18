@@ -1,0 +1,196 @@
+import sys
+import scenic
+import argparse
+import logging
+from scenicecocar.runners.rerun_command import rerun_command
+from scenicecocar.runners.run_command import run_command
+
+logger = logging.getLogger(__name__)
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog = "scenicecocar",
+        description = "Scenic scenario testing and replay.",
+    )
+
+    common = argparse.ArgumentParser(add_help = False)
+
+    common.add_argument(
+        "-v", "--verbosity",
+        type = int,
+        choices = (0, 1, 2, 3),
+        default = 0,
+    )
+
+    common.add_argument(
+        "--log-level",
+        choices = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        type = str.upper,
+        default = "INFO",
+    )
+
+
+    subparsers = parser.add_subparsers(
+        dest = "command",
+        required = True,
+    )
+
+    run = subparsers.add_parser(
+        "run",
+        parents = [common],
+        help = "Generate and simulate Scenic scenes",
+        description = "Run a Scenic testing campaign.",
+    )
+    run.add_argument(
+        "-p",
+        "--param",
+        help = "override a global parameter",
+        nargs = 2,
+        default = [],
+        action = "append",
+        metavar = ("PARAM", "VALUE"),
+    )
+    run.add_argument(
+        "--count",
+        help = "number of successful scenes to generate or simulations to run (default is infinity)",
+        type = int,
+        default = 0,
+    )
+    run.add_argument(
+        "--duration",
+        help = "duration in seconds to spend generating and simulating as many scenes as possible",
+        type = int,
+        default = 0,
+    )
+    run.add_argument(
+        "--stop-conditions",
+        choices = ["count", "first-failed", "first-passed", "first-invalid", "duration"],
+        default = [],
+        action = "append",
+        help = "conditions to stop generating and simulating scenes"
+    )
+    run.add_argument(
+        "--save-scenes",
+        action = "store_true",
+        help = "save scenes for debugging and replay"
+    )
+    run.add_argument(
+        "--save-dir",
+        default = "./saved_scenes",
+        help = "directory to save scenes for debugging and replay",
+        metavar = "DIR"
+    )
+    run.add_argument(
+        "--save-groups",
+        action = "append",
+        default = [],
+        choices = ["failed", "passed", "invalid"],
+        help = "save scenes depending on their status"
+    )
+    run.add_argument(
+        "--max-sims-per-scene",
+        type = int,
+        default = 1,
+        metavar = "N",
+        help = "max # of rejected simulations before sampling a new scene (default 1)",
+    )
+    run.add_argument(
+        "--scenario",
+        default = None,
+        help = "name of scenario to run (if file contains multiple)"
+    )
+    run.add_argument(
+        "scenic_file",
+        help = "a Scenic file to run",
+        metavar = "FILE"
+    )
+
+    rerun = subparsers.add_parser(
+        "rerun",
+        parents = [common],
+        help = "Rerun a scenic scene",
+        description = "Rerun a scenic scene.",
+    )
+    rerun.add_argument(
+        "scene_dir",
+        help = "a directory containg Scenes to run",
+        metavar = "DIR"
+    )
+
+    return parser
+
+def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> argparse.Namespace:
+    if args.command == "run":
+        if len(args.stop_conditions) == 0:
+            if args.count > 0:
+                args.stop_conditions.append("count")
+                logger.info("No stop-conditions provided and count is defined: adding 'count' as a stop condition")
+            if args.duration > 0:
+                args.stop_conditions.append("duration")
+                logger.info("No stop-conditions provided and duration is defined: adding 'duration' as a stop condition")
+
+            if len(args.stop_conditions) == 0:
+                args.stop_conditions.append("first-failed")
+                args.stop_conditions.append("duration")
+                args.duration = 3600
+                logger.info("No stop-conditions provided: adding 'first-failed' and 'duration' as stop condition (the duration is set to 60 minutes)")
+
+        if args.count > 0 and "count" not in args.stop_conditions:
+            logger.warning("Count is defined but is not present in stop-conditions")
+
+        if args.duration > 0 and "duration" not in args.stop_conditions:
+            logger.warning("Duration is defined but is not present in stop-conditions")
+
+        if "count" in args.stop_conditions and args.count <= 0:
+            parser.error("--stop-conditions count requires --count N")
+
+        if "duration" in args.stop_conditions and args.duration <= 0:
+            parser.error("--stop-conditions duration requires --count N")
+
+        if len(args.save_groups) == 0:
+            args.save_groups = ["failed"]
+
+        for condition in args.stop_conditions:
+            if condition.startswith("first-"):
+                if "count" not in args.stop_conditions and "duration" not in args.stop_conditions:
+                    args.stop_conditions.append("duration")
+                    if args.duration <= 0:
+                        args.duration = 3600
+                    logger.warning(f"Stop-conditions include '{condition}' but no other hard limit is present. Adding 'duration' as a stop-condition")
+                    break
+
+
+    if args.command == "rerun":
+        pass
+
+    return args
+
+def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+
+    parser = build_parser()
+
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(
+        level = getattr(logging, args.log_level),
+        format = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt = "%Y-%m-%d %H:%M:%S"
+    )
+
+    scenic.setDebuggingOptions(
+        verbosity = args.verbosity,
+    )
+
+    args = validate_args(parser, args)
+
+    print(args)
+
+    if args.command == "run":
+        return run_command(args)
+
+    if args.command == "rerun":
+        return rerun_command(args)
+
+    return 2
