@@ -1,3 +1,4 @@
+import os
 import sys
 import scenic
 import argparse
@@ -88,16 +89,14 @@ def build_parser():
         help = "save scenes depending on their status"
     )
     run.add_argument(
-        "--max-sims-per-scene",
-        type = int,
-        default = 1,
-        metavar = "N",
-        help = "max # of rejected simulations before sampling a new scene (default 1)",
-    )
-    run.add_argument(
         "--scenario",
         default = None,
         help = "name of scenario to run (if file contains multiple)"
+    )
+    run.add_argument(
+        "--ego-car-config",
+        help = "a yaml file containg the ego cars config",
+        metavar = "FILE"
     )
     run.add_argument(
         "scenic_file",
@@ -121,6 +120,13 @@ def build_parser():
 
 def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> argparse.Namespace:
     if args.command == "run":
+
+        if not os.path.isfile(args.scenic_file):
+            parser.error("scenic_file requires a path to a existing file")
+
+        if args.ego_car_config is not None and not os.path.isfile(args.ego_car_config):
+            parser.error("--ego-car-config requires a path to a existing file")
+
         hard_stop_present = False
         for condition in ["count", "duration"]:
             if condition in args.stop_conditions:
@@ -150,7 +156,7 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
                 args.stop_conditions.append("duration")
                 args.duration = 3600
 
-                logger.info(f"No stop-conditions provided: adding{added_first_failed} 'duration' as stop condition (the duration is set to 60 minutes)")
+                logger.info(f"No hard stop-conditions provided: adding{added_first_failed} 'duration' as stop condition (the duration is set to 60 minutes)")
 
         if args.count > 0 and "count" not in args.stop_conditions:
             logger.warning("Count is defined but is not present in stop-conditions")

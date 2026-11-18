@@ -5,6 +5,7 @@ import shutil
 import sys
 import time
 import scenic
+import dill
 import argparse
 import logging
 import scenic.core
@@ -12,6 +13,9 @@ import scenic.core.errors as errors
 import scenic.core.scenarios
 import scenic.syntax.translator as translator
 from scenic.core.errors import InvalidScenarioError
+
+from scenicecocar.tools.ego_config_parser import parse_ego_config
+from scenicecocar.tools.utility import SimulationResultType, run_simulation
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +93,11 @@ def run_command(args: argparse.Namespace) -> int:
     simulator = errors.callBeginningScenicTrace(
         scenario.getSimulator
     )
+
+    ego_car_sensors = []
+    if args.ego_car_config:
+        ego_car_sensors = parse_ego_config(args.ego_car_config)
+
     logging.info(f"Simulator connected and configured")
 
     if args.save_scenes:
@@ -99,16 +108,16 @@ def run_command(args: argparse.Namespace) -> int:
 
         shutil.copy2(args.scenic_file, os.path.join(base_folder_name, "scenario.scenic"))
 
+        if args.ego_car_config:
+            shutil.copy2(args.ego_car_config, os.path.join(base_folder_name, "ego_config.yaml"))
+
         metadata = {
             "original_scenario_path": os.path.abspath(args.scenic_file),
             "command": sys.argv.copy()
         }
 
-        json.dump(
-            metadata,
-            open(os.path.join(base_folder_name, "metadata.json"), "w"),
-            indent=4
-        )
+        with open(os.path.join(base_folder_name, "scenerio.bin"), "wb") as file:
+            dill.dump(scenario, file)
 
         logging.info(f"Saved initial run data ")
 
@@ -122,8 +131,11 @@ def run_command(args: argparse.Namespace) -> int:
 
     scene_results = []
     while True:
-        start_time = time.time()
+        scene_count += 1
 
+        logging.info(f"Running generation and simulation for scene {scene_count}")
+
+        start_time = time.time()
         logging.debug(f"Generating scene {scene_count}")
 
         scene, iterations = errors.callBeginningScenicTrace(
@@ -135,8 +147,128 @@ def run_command(args: argparse.Namespace) -> int:
         total_time = time.time() - start_time
         logging.debug(f"Generated scene {scene_count} in {iterations} iterations and {total_time:.4g} seconds")
 
-        simulation_result = None #TODO
 
-        
+        start_time = time.time()
+        logging.debug(f"Beginning scene simulation for scene {scene_count}")
+
+        simulation_result = run_simulation(
+            simulator,
+            scene,
+            max_steps = None,
+            name = str(scene_count),
+            verbosity = args.verbosity,
+            max_iterations = 1
+        )
+
+        total_time = time.time() - start_time
+        logging.debug(f"Ran simulation for scene {scene_count} in {total_time:.4g} seconds")
+
+        if simulation_result != SimulationResultType.INVALID:
+            generation_success_count += 1
+
+        scene_results.append(
+            {
+                "scene": scene_count,
+                "result": simulation_result.name,
+            }
+        )
+
+        if args.save_scenes == True and simulation_result.name in args.save_groups:
+            logging.debug(f"Scene {scene_count} returned {simulation_result.name} which is in save-groups. Saving scene")
+
+            save_folder = os.path.join(base_folder_name, f"scene_{scene_count}/")
+
+            os.mkdir(save_folder)
+
+            with open(os.path.join(save_folder, "scene.bin"), "wb") as file:
+                file.write(scene_data)
+
+            logging.debug(f"Saved scene {scene_count} at {save_folder}")
+
+        if "first-failed" in args.stop_conditions and simulation_result == SimulationResultType.FAILED:
+            logging.debug(f"Stopping at {scene_count} due to stop condition 'first-failed'")
+            break
+        if "first-passed" in args.stop_conditions and simulation_result == SimulationResultType.PASSED:
+            logging.debug(f"Stopping at {scene_count} due to stop condition 'first-passed'")
+            break
+        if "first-invalid" in args.stop_conditions and simulation_result == SimulationResultType.INVALID:
+            logging.debug(f"Stopping at {scene_count} due to stop condition 'first-invalid'")
+            break
+
+        if "count" in args.stop_conditions:
+            if generation_success_count >= args.count:
+                logging.debug(f"Stopping at {scene_count} due to stop condition 'count' with varient successful generations")
+                break
+            elif scene_count >= args.count * 10:
+                logging.debug(f"Stopping at {scene_count} due to stop condition 'count' with variant total generations")
+                break
+
+        if "duration" in args.stop_conditions:
+            spent_time = time.time() - loop_start_time
+            
+            if spent_time >= args.duration:
+                logging.debug(f"Stopping at {scene_count} due to stop condition 'duration'")
+                break
+
+
+
+    valid_scenes = 0
+    passed_scenes = 0
+    for scene_data in scene_results:
+        if scene_data["result"] != SimulationResultType.INVALID.name:
+            valid_scenes += 1
+
+            if scene_data["result"] == SimulationResultType.PASSED.name:
+                passed_scenes += 1
+
+    passed_rate = (passed_scenes / valid_scenes) * 100
+
+    report_text = [
+        "=" * 40,
+        "Scenic Test Report",
+        "=" * 40,
+        "",
+        f"Scenario: {args.scenic_file}",
+        f"Save Scenes: {args.save_scenes}",
+    ]
+
+    if args.save_scenes == True:
+        report_text.append(f"Save Location: {base_folder_name}")
+        report_text.append(f"Save Groups: [{', '.join(args.save_groups)}]")
+
+    report_text += [
+        f"Stop Conditions: [{', '.join(args.stop_conditions)}]",
+    ]
+
+    if args.count > 0:
+        report_text.append(f"Count: {args.count}")
+    if args.duration > 0:
+        report_text.append(f"Duration: {args.duration}")
+
+    report_text += [
+        f"Total Generated: {scene_count}",
+        "",
+        f"Passed: {passed_scenes} ({passed_rate:.1f}%)",
+        f"Failed: {valid_scenes - passed_scenes} ({(100 - passed_rate):.1f}%)",
+        f"Invalid: {scene_count - valid_scenes}"
+    ]
+
+    for line in report_text:
+        logging.info(line)
+
+    if args.save_scenes:
+        logging.debug("Saving run metadata")
+
+        metadata["scenes"] = scene_results
+        json.dump(
+            metadata,
+            open(os.path.join(base_folder_name, "metadata.json"), "w"),
+            indent=4
+        )
+
+        with open(os.path.join(base_folder_name, "report.txt"), "w") as file:
+            file.write("\n".join(report_text))
+
+        logging.debug("Saved run metadata")
 
     return 0
