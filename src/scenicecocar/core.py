@@ -124,7 +124,7 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         hard_stop_present = False
         for condition in ["count", "duration"]:
             if condition in args.stop_conditions:
-                condition = True
+                hard_stop_present = True
                 break
 
         if not hard_stop_present:
@@ -141,14 +141,14 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
                 logger.info("No hard stop-conditions provided and duration is defined: adding 'duration' as a stop condition")
 
             if any_defined == False:
-                
-                args.stop_conditions.append("duration")
-                args.duration = 3600
 
                 added_first_failed = ""
                 if len(args.stop_conditions) == 0:
                     added_first_failed = " 'first-failed' and"
                     args.stop_conditions.append("first-failed")
+
+                args.stop_conditions.append("duration")
+                args.duration = 3600
 
                 logger.info(f"No stop-conditions provided: adding{added_first_failed} 'duration' as stop condition (the duration is set to 60 minutes)")
 
@@ -162,7 +162,7 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
             parser.error("--stop-conditions count requires --count N")
 
         if "duration" in args.stop_conditions and args.duration <= 0:
-            parser.error("--stop-conditions duration requires --count N")
+            parser.error("--stop-conditions duration requires --duration N")
 
         if len(args.save_groups) == 0:
             args.save_groups = ["failed"]
