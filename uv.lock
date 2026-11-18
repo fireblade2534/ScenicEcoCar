@@ -1209,8 +1209,8 @@ wheels = [
 
 [[package]]
 name = "scenic"
-version = "3.1.1"
-source = { registry = "https://pypi.org/simple" }
+version = "3.2.0b1"
+source = { editable = "vendor/scenic" }
 dependencies = [
     { name = "antlr4-python3-runtime" },
     { name = "attrs" },
@@ -1236,10 +1236,62 @@ dependencies = [
     { name = "shapely" },
     { name = "trimesh" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/09/c7/2eac924ef9e9e363d27ac53fe4c779e9a431fbaad56e652b69a0e6199de3/scenic-3.1.1.tar.gz", hash = "sha256:54e11fb110b462303ff586ea6f0494b72b07e51e546ee6730a6279e65d065d9e", size = 506126, upload-time = "2026-05-07T23:54:54.575Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/02/c4a79442c2e54ca31a0fb8c253a6e6a4539a2fbd456de939b69d56319dfc/scenic-3.1.1-py3-none-any.whl", hash = "sha256:96e57e75152e855150faf074aa6431728e5855d1cbc64536ac678b61e45d8da0", size = 540933, upload-time = "2026-05-07T23:54:52.936Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "antlr4-python3-runtime", specifier = "~=4.11" },
+    { name = "astor", marker = "extra == 'test-full'", specifier = ">=0.8.1" },
+    { name = "attrs", specifier = ">=19.3.0" },
+    { name = "black", marker = "extra == 'dev'", specifier = "~=23.12.1" },
+    { name = "carla", marker = "(python_full_version < '3.13' and sys_platform == 'linux' and extra == 'test-full') or (python_full_version < '3.13' and sys_platform == 'win32' and extra == 'test-full')", specifier = ">=0.9.12" },
+    { name = "dill", marker = "extra == 'test-full'" },
+    { name = "dotmap", specifier = "~=1.3" },
+    { name = "exceptiongroup", marker = "extra == 'test-full'" },
+    { name = "inflect", marker = "extra == 'test-full'", specifier = "~=5.5" },
+    { name = "isort", marker = "extra == 'dev'", specifier = "~=5.12.0" },
+    { name = "manifold3d", specifier = ">=2.5.1" },
+    { name = "mapbox-earcut", specifier = ">=0.12.10" },
+    { name = "matplotlib", specifier = "~=3.2" },
+    { name = "metadrive-simulator", marker = "python_full_version < '3.12' and extra == 'test-full'", specifier = ">=0.4.3" },
+    { name = "metadrive-simulator", marker = "extra == 'metadrive'", specifier = ">=0.4.3" },
+    { name = "networkx", specifier = ">=2.6" },
+    { name = "numpy", specifier = ">=1.24" },
+    { name = "opencv-python", specifier = "~=4.5" },
+    { name = "pegen", specifier = ">=0.3.0" },
+    { name = "pillow", specifier = ">=9.1" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = "~=3.0" },
+    { name = "pygame", marker = "python_full_version < '3.10'", specifier = "~=2.0" },
+    { name = "pygame-ce", marker = "python_full_version >= '3.10'", specifier = ">=2.5.7,<3" },
+    { name = "pyglet", specifier = ">=1.5,<=1.5.26" },
+    { name = "pygments", marker = "extra == 'test-full'", specifier = "~=2.11" },
+    { name = "pyproj", marker = "python_full_version >= '3.10' and extra == 'guideways'", specifier = "~=3.3" },
+    { name = "pyproj", marker = "python_full_version < '3.10' and extra == 'guideways'", specifier = "~=3.0" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=7.0.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=3.0.0" },
+    { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=3.0.0" },
+    { name = "pytest-randomly", marker = "extra == 'test'", specifier = "~=3.2" },
+    { name = "python-fcl", specifier = ">=0.7" },
+    { name = "rtree", specifier = "~=1.0" },
+    { name = "rv-ltl", specifier = "~=0.1" },
+    { name = "scenariogeneration", marker = "extra == 'openscenario'" },
+    { name = "scenic", extras = ["guideways"], marker = "extra == 'test-full'" },
+    { name = "scenic", extras = ["openscenario"], marker = "extra == 'test-full'" },
+    { name = "scenic", extras = ["test"], marker = "extra == 'test-full'" },
+    { name = "scenic", extras = ["test-full"], marker = "extra == 'dev'" },
+    { name = "scikit-image", specifier = "~=0.21" },
+    { name = "scipy", marker = "python_full_version < '3.11'", specifier = "~=1.7" },
+    { name = "scipy", marker = "python_full_version >= '3.11'", specifier = ">=1.17.0" },
+    { name = "shapely", specifier = "~=2.0" },
+    { name = "sphinx", marker = "extra == 'test-full'", specifier = ">=6.2.0,<8" },
+    { name = "sphinx-rtd-theme", marker = "extra == 'test-full'", specifier = ">=0.5.2" },
+    { name = "sphinx-tabs", marker = "extra == 'test-full'", specifier = "~=3.4.1" },
+    { name = "sumolib", marker = "python_full_version < '3.12' and extra == 'test-full'", specifier = ">=1.21.0" },
+    { name = "sumolib", marker = "extra == 'metadrive'", specifier = ">=1.21.0" },
+    { name = "tox", marker = "extra == 'dev'", specifier = "~=4.0" },
+    { name = "trimesh", specifier = ">=4.6.0,<5" },
+    { name = "verifai", marker = "extra == 'test-full'", specifier = ">=2.2.0" },
 ]
+provides-extras = ["guideways", "metadrive", "openscenario", "test", "test-full", "dev"]
 
 [[package]]
 name = "scenicecocar"
@@ -1257,7 +1309,7 @@ requires-dist = [
     { name = "carla", specifier = "==0.9.16" },
     { name = "dill", specifier = ">=0.4.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "scenic", specifier = ">=3.1.1" },
+    { name = "scenic", editable = "vendor/scenic" },
 ]
 
 [[package]]

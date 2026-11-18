@@ -22,10 +22,6 @@ class GenericSensor(scenic.core.sensors.Sensor):
 
         self.convert = None
         self.carla_sensor = None
-        self.frame = 0
-
-    def onData(self, data):
-        self.frame = data.frame
 
     def getObservation(self):
         return None
