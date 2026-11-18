@@ -1,3 +1,4 @@
+import copy
 from datetime import datetime
 import json
 import os
@@ -141,6 +142,9 @@ def run_command(args: argparse.Namespace) -> int:
         scene, iterations = errors.callBeginningScenicTrace(
             lambda: scenario.generate(maxIterations=2000, verbosity=args.verbosity)
         )
+
+        for sensor in ego_car_sensors:
+            scene.egoObject.sensors[sensor.name] = copy.deepcopy(sensor)
 
         scene_data = scenario.sceneToBytes(scene)
 
