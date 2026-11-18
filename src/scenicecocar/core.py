@@ -108,12 +108,12 @@ def build_parser():
     rerun = subparsers.add_parser(
         "rerun",
         parents = [common],
-        help = "Rerun a scenic scene",
-        description = "Rerun a scenic scene.",
+        help = "rerun a scenic scene",
+        description = "rerun a scenic scene.",
     )
     rerun.add_argument(
         "scene_dir",
-        help = "a directory containg Scenes to run",
+        help = " directory containg Scenes to run",
         metavar = "DIR"
     )
 
@@ -121,19 +121,36 @@ def build_parser():
 
 def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> argparse.Namespace:
     if args.command == "run":
-        if len(args.stop_conditions) == 0:
+        hard_stop_present = False
+        for condition in ["count", "duration"]:
+            if condition in args.stop_conditions:
+                condition = True
+                break
+
+        if not hard_stop_present:
+            any_defined = False
+
             if args.count > 0:
                 args.stop_conditions.append("count")
-                logger.info("No stop-conditions provided and count is defined: adding 'count' as a stop condition")
+                any_defined = True
+                logger.info("No hard stop-conditions provided and count is defined: adding 'count' as a stop condition")
+
             if args.duration > 0:
                 args.stop_conditions.append("duration")
-                logger.info("No stop-conditions provided and duration is defined: adding 'duration' as a stop condition")
+                any_defined = True
+                logger.info("No hard stop-conditions provided and duration is defined: adding 'duration' as a stop condition")
 
-            if len(args.stop_conditions) == 0:
-                args.stop_conditions.append("first-failed")
+            if any_defined == False:
+                
                 args.stop_conditions.append("duration")
                 args.duration = 3600
-                logger.info("No stop-conditions provided: adding 'first-failed' and 'duration' as stop condition (the duration is set to 60 minutes)")
+
+                added_first_failed = ""
+                if len(args.stop_conditions) == 0:
+                    added_first_failed = " 'first-failed' and"
+                    args.stop_conditions.append("first-failed")
+
+                logger.info(f"No stop-conditions provided: adding{added_first_failed} 'duration' as stop condition (the duration is set to 60 minutes)")
 
         if args.count > 0 and "count" not in args.stop_conditions:
             logger.warning("Count is defined but is not present in stop-conditions")
@@ -150,16 +167,6 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         if len(args.save_groups) == 0:
             args.save_groups = ["failed"]
 
-        for condition in args.stop_conditions:
-            if condition.startswith("first-"):
-                if "count" not in args.stop_conditions and "duration" not in args.stop_conditions:
-                    args.stop_conditions.append("duration")
-                    if args.duration <= 0:
-                        args.duration = 3600
-                    logger.warning(f"Stop-conditions include '{condition}' but no other hard limit is present. Adding 'duration' as a stop-condition")
-                    break
-
-
     if args.command == "rerun":
         pass
 
@@ -175,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
 
     logging.basicConfig(
         level = getattr(logging, args.log_level),
-        format = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        format = "%(asctime)s | %(levelname)-8s | %(message)s",
         datefmt = "%Y-%m-%d %H:%M:%S"
     )
 
@@ -184,8 +191,6 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = validate_args(parser, args)
-
-    print(args)
 
     if args.command == "run":
         return run_command(args)
