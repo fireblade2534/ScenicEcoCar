@@ -177,7 +177,7 @@ def run_command(args: argparse.Namespace) -> int:
             }
         )
 
-        if args.save_scenes == True and simulation_result.name in args.save_groups:
+        if args.save_scenes == True and simulation_result.name.lower() in args.save_groups:
             logging.debug(f"Scene {scene_count} returned {simulation_result.name} which is in save-groups. Saving scene")
 
             save_folder = os.path.join(base_folder_name, f"scene_{scene_count}/")
