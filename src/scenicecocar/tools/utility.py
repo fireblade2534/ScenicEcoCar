@@ -47,7 +47,7 @@ def check_pass(simulation: scenic.core.simulators.Simulation) -> SimulationResul
         raise RuntimeError(
             f"record `PASSED` contains {passed!r} ({type(passed).__name__}), expected bool"
         )
-
+    
     if passed == False:
         return SimulationResultType.FAILED
 

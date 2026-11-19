@@ -88,7 +88,7 @@ def run_command(args: argparse.Namespace) -> int:
     )
 
     total_time = time.time() - start_time
-    logging.info(f"Scenario constructed in {total_time:.2f} seconds.")
+    logging.info(f"Scenario constructed in {total_time:.2f} seconds")
 
     logging.info("Connecting to simulator")
     simulator = errors.callBeginningScenicTrace(
@@ -127,6 +127,7 @@ def run_command(args: argparse.Namespace) -> int:
 
     loop_start_time = time.time()
 
+    any_saved = False
     scene_count = 0
     generation_success_count = 0
 
@@ -170,15 +171,20 @@ def run_command(args: argparse.Namespace) -> int:
         if simulation_result != SimulationResultType.INVALID:
             generation_success_count += 1
 
+        scene_saved = args.save_scenes == True and simulation_result.name.lower() in args.save_groups
+
         scene_results.append(
             {
                 "scene": scene_count,
                 "result": simulation_result.name,
+                "scene_saved": scene_saved,
             }
         )
 
-        if args.save_scenes == True and simulation_result.name.lower() in args.save_groups:
+        if scene_saved:
             logging.debug(f"Scene {scene_count} returned {simulation_result.name} which is in save-groups. Saving scene")
+
+            any_saved = True
 
             save_folder = os.path.join(base_folder_name, f"scene_{scene_count}/")
 
@@ -254,8 +260,17 @@ def run_command(args: argparse.Namespace) -> int:
         "",
         f"Passed: {passed_scenes} ({passed_rate:.1f}%)",
         f"Failed: {valid_scenes - passed_scenes} ({(100 - passed_rate):.1f}%)",
-        f"Invalid: {scene_count - valid_scenes}"
+        f"Invalid: {scene_count - valid_scenes}",
     ]
+
+    if any_saved == True:
+        report_text += [
+            "",
+            "Saved Scenes:"
+        ]
+        for item in scene_results:
+            if item["scene_saved"] == True:
+                report_text.append(f"  Scene {item['scene']} - {item['result']}")
 
     for line in report_text:
         logging.info(line)
@@ -275,4 +290,10 @@ def run_command(args: argparse.Namespace) -> int:
 
         logging.debug("Saved run metadata")
 
-    return 0
+    if "count" in args.stop_conditions and scene_count >= args.count * 10:
+        return 1
+
+    if passed_scenes != valid_scenes:
+        return 1
+
+    return 0 

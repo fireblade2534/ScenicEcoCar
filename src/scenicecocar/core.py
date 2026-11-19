@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import scenic
@@ -65,9 +66,11 @@ def build_parser():
     )
     run.add_argument(
         "--stop-conditions",
-        choices = ["count", "first-failed", "first-passed", "first-invalid", "duration"],
+        nargs = "+",
+        type = str.lower,
         default = [],
-        action = "append",
+        action = "extend",
+        choices = ["count", "first-failed", "first-passed", "first-invalid", "duration"],
         help = "conditions to stop generating and simulating scenes"
     )
     run.add_argument(
@@ -83,8 +86,10 @@ def build_parser():
     )
     run.add_argument(
         "--save-groups",
-        action = "append",
+        nargs = "+",
+        type = str.lower,
         default = [],
+        action = "extend",
         choices = ["failed", "passed", "invalid"],
         help = "save scenes depending on their status"
     )
@@ -111,11 +116,20 @@ def build_parser():
         description = "rerun a scenic scene.",
     )
     rerun.add_argument(
+        "--scenes",
+        nargs = "+",
+        type = str.lower,
+        default = [],
+        action = "extend",
+        metavar = "ID|START-END",
+        help = "scene IDs or inclusive ranges to rerun (default: all)",
+    )
+    rerun.add_argument(
         "scene_dir",
-        help = " directory containg Scenes to run",
+        help = "a directory containg Scenes to run",
         metavar = "DIR"
     )
-
+    
     return parser
 
 def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> argparse.Namespace:
@@ -174,8 +188,61 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
             args.save_groups = ["failed"]
 
     if args.command == "rerun":
-        pass
+        if not os.path.isdir(args.scene_dir):
+            parser.error("scene_dir requires a path to a existing folder")
 
+        with open(os.path.join(args.scene_dir, "metadata.json"), "r") as file:
+            metadata = json.load(file)
+
+        
+        if len(args.scenes) == 0:
+            args.scenes.append("all")
+            logger.info("No scenes provided: running all saved scenes")
+
+        run_scenes = []
+        if "all" in args.scenes:
+            for scene in metadata["scenes"]:
+                run_scenes.append(scene["scene"])
+        else:
+            for item in args.scenes:
+                if "-" in item:
+                    range_map = item.split("-")
+
+                    if len(range_map) != 2:
+                        parser.error(f"--scene has an invalid range: {item}")
+
+                    if not range_map[0].isdigit():
+                        parser.error(f"--scene has an invalid range: {item}")
+                    if not range_map[1].isdigit():
+                        parser.error(f"--scene has an invalid range: {item}")
+
+                    range_start = int(range_map[0])
+                    range_end = int(range_map[1])
+
+                    if range_start >= range_end:
+                        parser.error(f"--scene has an invalid range: {item} (start must be less then end)")
+
+                    run_scenes.extend(
+                        range(range_start, range_end + 1)
+                    )
+
+                elif item.isdigit():
+                    run_scenes.append(int(item))
+                else:
+                    parser.error(f"--scene has an invalid item: {item}")
+
+        run_scenes.sort()
+        run_scenes = list(dict.fromkeys(run_scenes))
+
+        valid_scenes = [x["scene"] for x in metadata["scenes"] if x["scene_saved"] == True]
+
+        args.scenes = []
+        for scene in run_scenes:
+            if scene in valid_scenes:
+                args.scenes.append(scene)
+            else:
+                parser.error(f"--scene has an invalid id: {scene}")
+                
     return args
 
 def main(argv: list[str] | None = None) -> int:
