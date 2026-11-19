@@ -7,6 +7,7 @@ import argparse
 import scenic.core.errors as errors
 import logging
 from scenicecocar.tools.ego_config_parser import parse_ego_config
+from scenicecocar.tools.replay_fix import repair_scenario_globals
 from scenicecocar.tools.utility import SimulationResultType, run_simulation
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,8 @@ def rerun_command(args: argparse.Namespace) -> int:
 
     with open(os.path.join(args.scene_dir, "scenerio.bin"), "rb") as file:
         scenario = dill.load(file)
+
+    repair_scenario_globals(scenario)
 
     total_time = time.time() - start_time
     logging.info(f"Scenario loaded in {total_time:.2f} seconds")
@@ -43,7 +46,7 @@ def rerun_command(args: argparse.Namespace) -> int:
         logging.debug(f"Loading scene {scene_count}")
         with open(os.path.join(args.scene_dir, f"scene_{scene_count}/scene.bin"), "rb") as file:
             scene = scenario.sceneFromBytes(file.read())
-
+            
         for sensor in ego_car_sensors:
             scene.egoObject.sensors[sensor.name] = copy.deepcopy(sensor)
 
