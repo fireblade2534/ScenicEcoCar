@@ -53,6 +53,11 @@ def build_parser():
         metavar = ("PARAM", "VALUE"),
     )
     run.add_argument(
+        "--run-name",
+        default = None,
+        help = "sets the name of a runs folder (default is date)"
+    )
+    run.add_argument(
         "--count",
         help = "number of successful scenes to generate or simulations to run (default is infinity)",
         type = int,
@@ -242,7 +247,7 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
                 args.scenes.append(scene)
             else:
                 parser.error(f"--scene has an invalid id: {scene}")
-                
+
     return args
 
 def main(argv: list[str] | None = None) -> int:

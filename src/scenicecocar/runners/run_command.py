@@ -102,7 +102,12 @@ def run_command(args: argparse.Namespace) -> int:
     logging.info(f"Simulator connected and configured")
 
     if args.save_scenes:
-        base_folder_name = os.path.join(args.save_dir, datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f"))
+
+        run_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+        if args.run_name is not None:
+            run_name = args.run_name
+
+        base_folder_name = os.path.join(args.save_dir, run_name)
         logging.info(f"Saving initial run data at {base_folder_name}")
 
         os.makedirs(base_folder_name)
