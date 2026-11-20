@@ -41,8 +41,8 @@ def parse_ego_config(path: str) -> list[GenericSensor]:
                 sensor_name,
                 sensor_config["type"],
                 offset = [
-                    float(position.get("x", 0.0)),
                     float(position.get("y", 0.0)),
+                    float(position.get("x", 0.0)),
                     float(position.get("z", 0.0))
                 ],
                 rotation = [

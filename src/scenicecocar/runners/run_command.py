@@ -105,7 +105,7 @@ def run_command(args: argparse.Namespace) -> int:
 
         run_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
         if args.run_name is not None:
-            run_name = args.run_name
+            run_name = args.run_name.strip()
 
         base_folder_name = os.path.join(args.save_dir, run_name)
         logging.info(f"Saving initial run data at {base_folder_name}")
@@ -148,6 +148,8 @@ def run_command(args: argparse.Namespace) -> int:
         scene, iterations = errors.callBeginningScenicTrace(
             lambda: scenario.generate(maxIterations=2000, verbosity=args.verbosity)
         )
+
+        scene.egoObject.rolename = "hero"
 
         for sensor in ego_car_sensors:
             scene.egoObject.sensors[sensor.name] = copy.deepcopy(sensor)

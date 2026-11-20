@@ -1,0 +1,35 @@
+
+{
+  "name": "ROS 2 Kilted",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": ".."
+  },
+
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+
+  "containerEnv": {
+    "ROS_DOMAIN_ID": "0",
+    "ROS_LOCALHOST_ONLY": "0"
+  },
+
+  "remoteUser": "ubuntu",
+  "updateRemoteUserUID": false,
+  "overrideCommand": true,
+  "postStartCommand": "bash /usr/local/bin/base_entrypoint.sh",
+
+  "runArgs": [
+    "--network=host",
+    "--ipc=host"
+  ],
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  }
+}

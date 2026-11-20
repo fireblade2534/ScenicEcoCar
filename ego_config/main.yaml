@@ -45,18 +45,18 @@ sensors:
         yaw: 0.0
         roll: 0.0
     attributes:
-      horizontal_fov: 60.0
-      vertical_fov: 60.0
-      range: 100.0
-      points_per_second: 3000
+      horizontal_fov: 10.0
+      vertical_fov: 10.0
+      range: 200.0
+      points_per_second: 30000
 
   imu:
     type: "sensor.other.imu"
     transform:
       position:
-        x: 0
+        x: 0.0
         y: 0.0
-        z: 0
+        z: 0.0
       rotation:
         pitch: 0.0
         yaw: 0.0
@@ -66,9 +66,9 @@ sensors:
     type: "sensor.other.gnss"
     transform:
       position:
-        x: 0
+        x: 0.0
         y: 0.0
-        z: 0
+        z: 0.0
       rotation:
         pitch: 0.0
         yaw: 0.0

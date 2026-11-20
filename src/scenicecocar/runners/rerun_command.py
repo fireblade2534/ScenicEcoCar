@@ -19,6 +19,7 @@ def rerun_command(args: argparse.Namespace) -> int:
     with open(os.path.join(args.scene_dir, "scenerio.bin"), "rb") as file:
         scenario = dill.load(file)
 
+    # Fix globals being loaded as seperate items instead of linked items
     repair_scenario_globals(scenario)
 
     total_time = time.time() - start_time
@@ -46,6 +47,8 @@ def rerun_command(args: argparse.Namespace) -> int:
         logging.debug(f"Loading scene {scene_count}")
         with open(os.path.join(args.scene_dir, f"scene_{scene_count}/scene.bin"), "rb") as file:
             scene = scenario.sceneFromBytes(file.read())
+
+        scene.egoObject.rolename = "hero"
             
         for sensor in ego_car_sensors:
             scene.egoObject.sensors[sensor.name] = copy.deepcopy(sensor)
