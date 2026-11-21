@@ -109,6 +109,16 @@ def build_parser():
         metavar = "FILE"
     )
     run.add_argument(
+        "--render",
+        action = "store_true",
+        help = "should a 3rd person camera be rendered behind the ego vehicle",
+    )
+    run.add_argument(
+        "--detailed-report"
+        action = "store_true",
+        help = "returns a more detailed report",
+    )
+    run.add_argument(
         "scenic_file",
         help = "a Scenic file to run",
         metavar = "FILE"
@@ -128,6 +138,16 @@ def build_parser():
         action = "extend",
         metavar = "ID|START-END",
         help = "scene IDs or inclusive ranges to rerun (default: all)",
+    )
+    rerun.add_argument(
+        "--render",
+        action = "store_true",
+        help = "should a 3rd person camera be rendered behind the ego vehicle",
+    )
+    rerun.add_argument(
+        "--detailed-report"
+        action = "store_true",
+        help = "returns a more detailed report",
     )
     rerun.add_argument(
         "scene_dir",

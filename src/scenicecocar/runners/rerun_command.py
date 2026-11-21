@@ -30,6 +30,8 @@ def rerun_command(args: argparse.Namespace) -> int:
         scenario.getSimulator
     )
 
+    simulator.render = args.render
+
     ego_car_sensors = []
     ego_config_path = os.path.join(args.scene_dir, "ego_config.yaml")
     if os.path.isfile(ego_config_path):
@@ -59,7 +61,7 @@ def rerun_command(args: argparse.Namespace) -> int:
         start_time = time.time()
         logging.debug(f"Beginning scene simulation for scene {scene_count}")
 
-        simulation_result = run_simulation(
+        simulation_result, passed_records, failed_records  = run_simulation(
             simulator,
             scene,
             max_steps = None,
@@ -78,6 +80,8 @@ def rerun_command(args: argparse.Namespace) -> int:
             {
                 "scene": scene_count,
                 "result": simulation_result.name,
+                "passed_records": passed_records,
+                "failed_records": failed_records,
                 "scene_saved": False,
             }
         )
@@ -105,11 +109,19 @@ def rerun_command(args: argparse.Namespace) -> int:
         f"Failed: {valid_scenes - passed_scenes} ({(100 - passed_rate):.1f}%)",
         f"Invalid: {len(args.scenes) - valid_scenes}",
         "",
-        "Saved Scenes:"
+        "Scenes:"
     ]
 
     for item in scene_results:
-        report_text.append(f"  Scene {item['scene']} - {item['result']}")
+        if args.detailed_report == True:
+            report_text += [
+                f"  Scene {item['scene']}:",
+                f"    Result: {item['result']}",
+                f"    Passed Records: [{', '.join(item['passed_records'])}]",
+                f"    Failed Records: [{', '.join(item['failed_records'])}]"
+            ]
+        else:
+            report_text.append(f"  Scene {item['scene']} - {item['result']}")
 
     for line in report_text:
         logging.info(line)

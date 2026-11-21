@@ -16,43 +16,43 @@ import scenic.syntax.translator as translator
 from scenic.core.errors import InvalidScenarioError
 
 from scenicecocar.tools.ego_config_parser import parse_ego_config
-from scenicecocar.tools.utility import SimulationResultType, run_simulation
+from scenicecocar.tools.utility import SimulationResultType, is_failed_type, is_passed_type, run_simulation
 
 logger = logging.getLogger(__name__)
 
-def validateTestRecords(scenerio: scenic.core.scenarios.Scenario):
-    failed_found = False
-    passed_found = False
+def validateTestRecords(scenerio: scenic.core.scenarios.Scenario) -> bool:
+    failed_seen = set()
+    passed_seen = set()
 
     for record in scenerio.recordedFinalExprs:
-        if record.name == "PASSED":
-            if passed_found == True:
-                raise InvalidScenarioError("Only one `PASSED` record final is allowed")
-            passed_found = True
+        if is_passed_type(record.name) == True:
+            if record.name in passed_seen:
+                raise InvalidScenarioError(f"Only one `{record.name}` record final is allowed")
+            passed_seen.add(record.name)
 
-        if record.name == "FAILED":
-            if failed_found == True:
-                raise InvalidScenarioError("Only one `FAILED` record final is allowed")
-            failed_found = True
+        if is_failed_type(record.name) == True:
+            if record.name in failed_seen:
+                raise InvalidScenarioError(f"Only one `{record.name}` record final is allowed")
+            failed_seen.add(record.name)
     
-    if passed_found == False:
+    if len(passed_seen) == 0:
         raise InvalidScenarioError("A `PASSED` record final is required")
     
     for record in scenerio.recordedExprs:
-        if record.name == "PASSED":
-            raise InvalidScenarioError("The `PASSED` record can only be a record final")
+        if is_passed_type(record.name) == True:
+            raise InvalidScenarioError(f"The `{record.name}` record can only be a record final")
 
-        if record.name == "FAILED":
-            if failed_found == True:
-                raise InvalidScenarioError("Only one `FAILED` record is allowed")
-            failed_found = True
+        if is_failed_type(record.name) == True:
+            if record.name in failed_seen:
+                raise InvalidScenarioError(f"Only one `{record.name}` record is allowed")
+            failed_seen.add(record.name)
 
     for record in scenerio.recordedInitialExprs:
-        if record.name == "PASSED":
-            raise InvalidScenarioError("The `PASSED` record can only be a record final")
+        if is_passed_type(record.name) == True:
+            raise InvalidScenarioError(f"The `{record.name}` record can only be a record final")
 
-        if record.name == "FAILED":
-            raise InvalidScenarioError("The `FAILED` record cannot be a record initial")
+        if is_failed_type(record.name) == True:
+            raise InvalidScenarioError(f"The `{record.name}` record cannot be a record initial")
         
     return True
 
@@ -95,6 +95,8 @@ def run_command(args: argparse.Namespace) -> int:
         scenario.getSimulator
     )
 
+    simulator.render = args.render
+
     ego_car_sensors = []
     if args.ego_car_config:
         ego_car_sensors = parse_ego_config(args.ego_car_config)
@@ -132,7 +134,6 @@ def run_command(args: argparse.Namespace) -> int:
 
     loop_start_time = time.time()
 
-    any_saved = False
     scene_count = 0
     generation_success_count = 0
 
@@ -163,7 +164,7 @@ def run_command(args: argparse.Namespace) -> int:
         start_time = time.time()
         logging.debug(f"Beginning scene simulation for scene {scene_count}")
 
-        simulation_result = run_simulation(
+        simulation_result, passed_records, failed_records = run_simulation(
             simulator,
             scene,
             max_steps = None,
@@ -184,14 +185,14 @@ def run_command(args: argparse.Namespace) -> int:
             {
                 "scene": scene_count,
                 "result": simulation_result.name,
+                "passed_records": passed_records,
+                "failed_records": failed_records,
                 "scene_saved": scene_saved,
             }
         )
 
         if scene_saved:
             logging.debug(f"Scene {scene_count} returned {simulation_result.name} which is in save-groups. Saving scene")
-
-            any_saved = True
 
             save_folder = os.path.join(base_folder_name, f"scene_{scene_count}/")
 
@@ -268,16 +269,21 @@ def run_command(args: argparse.Namespace) -> int:
         f"Passed: {passed_scenes} ({passed_rate:.1f}%)",
         f"Failed: {valid_scenes - passed_scenes} ({(100 - passed_rate):.1f}%)",
         f"Invalid: {scene_count - valid_scenes}",
+        "",
+        "Scenes:"
     ]
 
-    if any_saved == True:
-        report_text += [
-            "",
-            "Saved Scenes:"
-        ]
-        for item in scene_results:
-            if item["scene_saved"] == True:
-                report_text.append(f"  Scene {item['scene']} - {item['result']}")
+    for item in scene_results:
+        if args.detailed_report == True:
+            report_text += [
+                f"  Scene {item['scene']}:",
+                f"    Result: {item['result']}",
+                f"    Saved: {item['scene_saved']}",
+                f"    Passed Records: [{', '.join(item['passed_records'])}]",
+                f"    Failed Records: [{', '.join(item['failed_records'])}]"
+            ]
+        else:
+            report_text.append(f"  Scene {item['scene']} - {item['result']}")            
 
     for line in report_text:
         logging.info(line)

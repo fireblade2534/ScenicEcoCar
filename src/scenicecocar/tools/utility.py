@@ -2,6 +2,7 @@ import scenic
 import logging
 from enum import Enum
 import scenic.core
+from scenic.core.dynamics.guards import InvariantViolation
 import scenic.core.scenarios
 import scenic.core.simulators
 import scenic.core.errors as errors
@@ -20,7 +21,7 @@ def run_simulation(
         name: str = "simulation",
         verbosity: int = 0,
         max_iterations: int = 1
-    ) -> SimulationResultType:
+    ) -> tuple[SimulationResultType, list[str], list[str]]:
 
     try:
         simulation = errors.callBeginningScenicTrace(
@@ -30,45 +31,67 @@ def run_simulation(
                 name = str(name),
                 verbosity = verbosity,
                 maxIterations = max_iterations,
+                raiseGuardViolations=True,
             )
         )
     except scenic.core.simulators.SimulationCreationError as E:
         logging.error(f"Failed to create simulation: {E}")
+        return (SimulationResultType.INVALID, [], [])
+    except InvariantViolation as e:
+        logging.warning(f"Invariant violated: {e}")
+        return (SimulationResultType.INVALID, [], [])
 
-        return SimulationResultType.INVALID
+    if simulation is None:
+        return (SimulationResultType.INVALID, [], [])
 
     return check_pass(simulation)
     
+def is_failed_type(name: str) -> bool:
+    if name.startswith("FAILED"):
+        return True
+    return False
 
-def check_pass(simulation: scenic.core.simulators.Simulation) -> SimulationResultType:
-    passed = simulation.result.records["PASSED"]
+def is_passed_type(name: str) -> bool:
+    if name.startswith("PASSED"):
+        return True
+    return False
 
-    if type(passed) is not bool:
-        raise RuntimeError(
-            f"record `PASSED` contains {passed!r} ({type(passed).__name__}), expected bool"
-        )
+def check_pass(simulation: scenic.core.simulators.Simulation) -> tuple[SimulationResultType, list[str], list[str]]:
+    passed = []
+    failed = []
+
+    for key, record in simulation.result.records.items():
+        if is_passed_type(key) == True:
+            if type(record) is not bool:
+                raise RuntimeError(
+                    f"record `{key}` contains {record!r} ({type(record).__name__}), expected bool"
+                )
+
+            if record == True:
+                passed.append(key)
+
+        elif is_failed_type(key) == True:
+            if type(record) is bool:
+                if record == True:
+                    failed.append(key)
+            elif isinstance(record, list):
+                for step, value in record:
+                    if type(value) is not bool:
+                        raise RuntimeError(
+                            f"record `{key}` at step {step}, contains {value!r} ({type(value).__name__}), expected bool"
+                        )
+
+                    if value == True:
+                        failed.append(key)
+                        break
+
+            else:
+                raise RuntimeError(
+                    f"record `{key}` contains {record!r} ({type(record).__name__}), expected bool"
+                )
+
+
+    if len(passed) == 0 or len(failed) > 0:
+        return (SimulationResultType.FAILED, passed, failed)
     
-    if passed == False:
-        return SimulationResultType.FAILED
-
-    failed = simulation.result.records.get("FAILED", None)
-    if failed is not None:
-        if type(failed) is bool:
-            if failed == True:
-                return SimulationResultType.FAILED
-        elif isinstance(failed, list):
-            for step, value in failed:
-                if type(value) is not bool:
-                    raise RuntimeError(
-                        f"record `FAILED` at step {step}, contains {value!r} ({type(value).__name__}), expected bool"
-                    )
-
-                if value == True:
-                    return SimulationResultType.FAILED
-
-        else:
-            raise RuntimeError(
-                f"record `FAILED` contains {failed!r} ({type(failed).__name__}), expected bool"
-            )
-
-    return SimulationResultType.PASSED
+    return (SimulationResultType.PASSED, passed, failed)
