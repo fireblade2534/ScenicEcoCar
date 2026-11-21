@@ -58,6 +58,12 @@ def build_parser():
         help = "sets the name of a runs folder (default is date)"
     )
     run.add_argument(
+        "--rtf",
+        help = "maxium rtf to run the simulation at",
+        type = float,
+        default = None,
+    )
+    run.add_argument(
         "--count",
         help = "number of successful scenes to generate or simulations to run (default is infinity)",
         type = int,
@@ -143,6 +149,12 @@ def build_parser():
         parents = [common],
         help = "rerun a scenic scene",
         description = "rerun a scenic scene.",
+    )
+    rerun.add_argument(
+        "--rtf",
+        help = "maxium rtf to run the simulation at",
+        type = float,
+        default = None,
     )
     rerun.add_argument(
         "--scenes",

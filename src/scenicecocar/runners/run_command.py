@@ -170,7 +170,8 @@ def run_command(args: argparse.Namespace) -> int:
             max_steps = None,
             name = str(scene_count),
             verbosity = args.verbosity,
-            max_iterations = 1
+            max_iterations = 1,
+            rtf = args.rtf
         )
 
         total_time = time.time() - start_time

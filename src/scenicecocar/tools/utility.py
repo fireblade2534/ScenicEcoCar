@@ -20,7 +20,8 @@ def run_simulation(
         max_steps: int | None = None,
         name: str = "simulation",
         verbosity: int = 0,
-        max_iterations: int = 1
+        max_iterations: int = 1,
+        rtf: float | None = None,
     ) -> tuple[SimulationResultType, list[str], list[str]]:
 
     try:
@@ -31,7 +32,8 @@ def run_simulation(
                 name = str(name),
                 verbosity = verbosity,
                 maxIterations = max_iterations,
-                raiseGuardViolations=True,
+                raiseGuardViolations = True,
+                rtf = rtf,
             )
         )
     except scenic.core.simulators.SimulationCreationError as E:

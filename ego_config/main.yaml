@@ -39,16 +39,16 @@ sensors:
       position:
         x: 1.3
         y: 0.0
-        z: 1.5
+        z: 1.3
       rotation:
         pitch: 0.0
         yaw: 0.0
         roll: 0.0
     attributes:
-      horizontal_fov: 10.0
-      vertical_fov: 10.0
+      horizontal_fov: 5.0
+      vertical_fov: 5.0
       range: 200.0
-      points_per_second: 30000
+      points_per_second: 10000
 
   imu:
     type: "sensor.other.imu"
