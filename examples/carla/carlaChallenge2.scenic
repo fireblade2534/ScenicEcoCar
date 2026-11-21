@@ -55,6 +55,10 @@ ego = new Car following roadDirection from leadCar for Range(-15, -10),
 
 require (distance to intersection) > 80
 
+require abs(relative heading of
+    (roadDirection at ego.position)
+    from (roadDirection at obstacle.position)) < 5 deg
+
 
 ## TEST TERMINATION
 
