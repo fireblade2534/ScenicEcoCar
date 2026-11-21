@@ -37,7 +37,7 @@ class RadarFollower : public rclcpp::Node {
   }
 
 public:
-  RadarFollower() : Node("lidar_follower", simOptions()) {
+  RadarFollower() : Node("radar_follower", simOptions()) {
     gap_ = std::max(1.0, declare_parameter<double>("target_gap", 5.0));
     half_width_ = std::max(0.5, declare_parameter<double>("half_width", 1.4));
     cruise_throttle_ = std::clamp(

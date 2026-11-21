@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-bash /usr/local/bin/base_entrypoint.sh
+source /usr/local/bin/base_entrypoint.sh
 
 echo "=== Building application workspace ==="
 if [ -d /workspace/src ]; then

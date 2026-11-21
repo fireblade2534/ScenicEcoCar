@@ -39,97 +39,110 @@ def rerun_command(args: argparse.Namespace) -> int:
 
     logging.info(f"Simulator connected and configured")
 
-    generation_success_count = 0
+    try:
+        generation_success_count = 0
 
-    scene_results = []
-    for scene_count in args.scenes:
-        logging.info(f"Starting loading and simulation for scene {scene_count}")
+        scene_results = []
+        for scene_count in args.scenes:
+            logging.info(f"Starting loading and simulation for scene {scene_count}")
 
-        start_time = time.time()
-        logging.debug(f"Loading scene {scene_count}")
-        with open(os.path.join(args.scene_dir, f"scene_{scene_count}/scene.bin"), "rb") as file:
-            scene = scenario.sceneFromBytes(file.read())
+            start_time = time.time()
+            logging.debug(f"Loading scene {scene_count}")
+            with open(os.path.join(args.scene_dir, f"scene_{scene_count}/scene.bin"), "rb") as file:
+                scene = scenario.sceneFromBytes(file.read())
 
-        scene.egoObject.rolename = "hero"
-            
-        for sensor in ego_car_sensors:
-            scene.egoObject.sensors[sensor.name] = copy.deepcopy(sensor)
+            scene.egoObject.rolename = "hero"
+                
+            for sensor in ego_car_sensors:
+                scene.egoObject.sensors[sensor.name] = copy.deepcopy(sensor)
 
-        total_time = time.time() - start_time
-        logging.debug(f"Loaded scene {scene_count} in {total_time:.4g} seconds")
+            total_time = time.time() - start_time
+            logging.debug(f"Loaded scene {scene_count} in {total_time:.4g} seconds")
 
-        start_time = time.time()
-        logging.debug(f"Beginning scene simulation for scene {scene_count}")
+            start_time = time.time()
+            logging.debug(f"Beginning scene simulation for scene {scene_count}")
 
-        simulation_result, passed_records, failed_records  = run_simulation(
-            simulator,
-            scene,
-            max_steps = None,
-            name = str(scene_count),
-            verbosity = args.verbosity,
-            max_iterations = 1,
-            rtf = args.rtf
-        )
+            simulation_result, passed_records, failed_records = run_simulation(
+                simulator,
+                scene,
+                max_steps = None,
+                name = str(scene_count),
+                verbosity = args.verbosity,
+                max_iterations = 1,
+                rtf = args.rtf
+            )
 
-        total_time = time.time() - start_time
-        logging.debug(f"Ran simulation for scene {scene_count} in {total_time:.4g} seconds")
+            total_time = time.time() - start_time
+            logging.debug(f"Ran simulation for scene {scene_count} in {total_time:.4g} seconds")
 
-        if simulation_result != SimulationResultType.INVALID:
-            generation_success_count += 1
+            if simulation_result != SimulationResultType.INVALID:
+                generation_success_count += 1
 
-        scene_results.append(
-            {
-                "scene": scene_count,
-                "result": simulation_result.name,
-                "passed_records": passed_records,
-                "failed_records": failed_records,
-                "scene_saved": False,
-            }
-        )
+            scene_results.append(
+                {
+                    "scene": scene_count,
+                    "result": simulation_result.name,
+                    "passed_records": passed_records,
+                    "failed_records": failed_records,
+                    "scene_saved": False,
+                }
+            )
 
-    logging.info("")
-    
-    valid_scenes = 0
-    passed_scenes = 0
-    for scene_data in scene_results:
-        if scene_data["result"] != SimulationResultType.INVALID.name:
-            valid_scenes += 1
+        logging.info("")
+        
+        valid_scenes = 0
+        passed_scenes = 0
+        for scene_data in scene_results:
+            if scene_data["result"] != SimulationResultType.INVALID.name:
+                valid_scenes += 1
 
-            if scene_data["result"] == SimulationResultType.PASSED.name:
-                passed_scenes += 1
+                if scene_data["result"] == SimulationResultType.PASSED.name:
+                    passed_scenes += 1
 
-    passed_rate = (passed_scenes / valid_scenes) * 100
-
-    report_text = [
-        "=" * 40,
-        "Scenic Test Report",
-        "=" * 40,
-        "",
-        f"Scenario: {args.scene_dir}",
-        f"Total Generated: {len(args.scenes)}",
-        "",
-        f"Passed: {passed_scenes} ({passed_rate:.1f}%)",
-        f"Failed: {valid_scenes - passed_scenes} ({(100 - passed_rate):.1f}%)",
-        f"Invalid: {len(args.scenes) - valid_scenes}",
-        "",
-        "Scenes:"
-    ]
-
-    for item in scene_results:
-        if args.detailed_report == True:
-            report_text += [
-                f"  Scene {item['scene']}:",
-                f"    Result: {item['result']}",
-                f"    Passed Records: [{', '.join(item['passed_records'])}]",
-                f"    Failed Records: [{', '.join(item['failed_records'])}]"
-            ]
+        if valid_scenes > 0:
+            passed_rate = (passed_scenes / valid_scenes) * 100
+            failed_rate = 100 - passed_rate
         else:
-            report_text.append(f"  Scene {item['scene']} - {item['result']}")
+            passed_rate = 0.0
+            failed_rate = 0.0
 
-    for line in report_text:
-        logging.info(line)
+        report_text = [
+            "=" * 40,
+            "Scenic Test Report",
+            "=" * 40,
+            "",
+            f"Scenario: {args.scene_dir}",
+            f"Total Generated: {len(args.scenes)}",
+            "",
+            f"Passed: {passed_scenes} ({passed_rate:.1f}%)",
+            f"Failed: {valid_scenes - passed_scenes} ({failed_rate:.1f}%)",
+            f"Invalid: {len(args.scenes) - valid_scenes}",
+            "",
+            "Scenes:"
+        ]
 
-    if valid_scenes != passed_scenes:
-        return 1
+        for item in scene_results:
+            if args.detailed_report == True:
+                report_text += [
+                    f"  Scene {item['scene']}:",
+                    f"    Result: {item['result']}",
+                    f"    Passed Records: [{', '.join(item['passed_records'])}]",
+                    f"    Failed Records: [{', '.join(item['failed_records'])}]"
+                ]
+            else:
+                report_text.append(f"  Scene {item['scene']} - {item['result']}")
 
-    return 0
+        for line in report_text:
+            logging.info(line)
+
+        if valid_scenes != passed_scenes or valid_scenes == 0:
+            return 1
+    
+        return 0
+    except KeyboardInterrupt:
+        pass
+    finally:
+        simulator.destroy()
+
+    return 2
+    

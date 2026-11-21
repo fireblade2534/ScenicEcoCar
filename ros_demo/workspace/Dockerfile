@@ -45,4 +45,4 @@ RUN chmod +x /usr/local/bin/ros_entrypoint.sh
 WORKDIR /workspace
 
 ENTRYPOINT ["/bin/bash", "/usr/local/bin/ros_entrypoint.sh"]
-CMD ["ros2", "run", "carla_control", "lidar_follower"]
+CMD ["ros2", "run", "carla_control", "radar_follower"]
