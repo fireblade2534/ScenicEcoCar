@@ -84,7 +84,5 @@ record final (
 
 # OPTIONAL: Any collision during the simulation fails the test.
 # This is checked at every simulation step.
-record bool(
-    (ego intersects leadCar)
-    or (ego intersects obstacle)
-) as FAILED
+record bool(ego intersects leadCar) as FAILED_LEADCAR_INTERSECT
+record bool(ego intersects obstacle) as FAILED_OBSTACLE_INTERSECT

@@ -228,7 +228,7 @@ def run_command(args: argparse.Namespace) -> int:
                 logging.debug(f"Stopping at {scene_count} due to stop condition 'duration'")
                 break
 
-
+    logging.info("")
 
     valid_scenes = 0
     passed_scenes = 0
@@ -274,6 +274,9 @@ def run_command(args: argparse.Namespace) -> int:
     ]
 
     for item in scene_results:
+        if args.filter_report and item['result'].lower() not in args.report_groups:
+            continue
+
         if args.detailed_report == True:
             report_text += [
                 f"  Scene {item['scene']}:",

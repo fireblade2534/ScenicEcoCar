@@ -85,6 +85,8 @@ def rerun_command(args: argparse.Namespace) -> int:
                 "scene_saved": False,
             }
         )
+
+    logging.info("")
     
     valid_scenes = 0
     passed_scenes = 0

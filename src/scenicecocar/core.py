@@ -114,9 +114,23 @@ def build_parser():
         help = "should a 3rd person camera be rendered behind the ego vehicle",
     )
     run.add_argument(
-        "--detailed-report"
+        "--detailed-report",
         action = "store_true",
         help = "returns a more detailed report",
+    )
+    run.add_argument(
+        "--filter-report",
+        action = "store_true",
+        help = "filters the report based on scene statuses",
+    )
+    run.add_argument(
+        "--report-groups",
+        nargs = "+",
+        type = str.lower,
+        default = [],
+        action = "extend",
+        choices = ["failed", "passed", "invalid"],
+        help = "the scene statuses to filter the report on"
     )
     run.add_argument(
         "scenic_file",
@@ -145,7 +159,7 @@ def build_parser():
         help = "should a 3rd person camera be rendered behind the ego vehicle",
     )
     rerun.add_argument(
-        "--detailed-report"
+        "--detailed-report",
         action = "store_true",
         help = "returns a more detailed report",
     )
@@ -209,6 +223,19 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         if "duration" in args.stop_conditions and args.duration <= 0:
             parser.error("--stop-conditions duration requires --duration N")
 
+        if args.filter_report == False and len(args.report_groups) != 0:
+            logger.warning("Report-groups is defined but filter-report is false")
+
+        if args.save_scenes == False and len(args.save_groups) != 0:
+            logger.warning("Save-groups is defined but save-scenes is false")
+
+        if args.filter_report == True and len(args.report_groups) == 0:
+            if len(args.save_groups) != 0 and args.save_scenes:
+                args.report_groups = args.save_groups
+                logger.info("No report groups provided and save groups is defined: using save groups as report groups")
+            else:
+                args.report_groups = ["failed"]
+
         if len(args.save_groups) == 0:
             args.save_groups = ["failed"]
 
@@ -227,7 +254,8 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         run_scenes = []
         if "all" in args.scenes:
             for scene in metadata["scenes"]:
-                run_scenes.append(scene["scene"])
+                if scene["scene_saved"] == True:
+                    run_scenes.append(scene["scene"])
         else:
             for item in args.scenes:
                 if "-" in item:
