@@ -264,49 +264,64 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
             logger.info("No scenes provided: running all saved scenes")
 
         run_scenes = []
-        if "all" in args.scenes:
-            for scene in metadata["scenes"]:
-                if scene["scene_saved"] == True:
-                    run_scenes.append(scene["scene"])
-        else:
-            for item in args.scenes:
-                if "-" in item:
-                    range_map = item.split("-")
 
-                    if len(range_map) != 2:
-                        parser.error(f"--scene has an invalid range: {item}")
+        for item in args.scenes:
+            item_scenes = [[], 1]
 
-                    if not range_map[0].isdigit():
-                        parser.error(f"--scene has an invalid range: {item}")
-                    if not range_map[1].isdigit():
-                        parser.error(f"--scene has an invalid range: {item}")
+            processed_item = item
+            if "x" in item:
+                multiplier_map = item.split("x")
+                if len(multiplier_map) != 2:
+                    parser.error(f"--scene has an invalid multiplier: {item}")
 
-                    range_start = int(range_map[0])
-                    range_end = int(range_map[1])
+                if not multiplier_map[1].isdigit():
+                    parser.error(f"--scene has an invalid multiplier: {item}")
 
-                    if range_start >= range_end:
-                        parser.error(f"--scene has an invalid range: {item} (start must be less then end)")
+                item_scenes[1] = int(multiplier_map[1])
+                processed_item = multiplier_map[0]
 
-                    run_scenes.extend(
-                        range(range_start, range_end + 1)
-                    )
+            if processed_item == "all":
+                for scene in metadata["scenes"]:
+                    if scene["scene_saved"] == True:
+                        item_scenes[0].append(scene["scene"])
+            elif "-" in processed_item:
+                range_map = processed_item.split("-")
 
-                elif item.isdigit():
-                    run_scenes.append(int(item))
-                else:
-                    parser.error(f"--scene has an invalid item: {item}")
+                if len(range_map) != 2:
+                    parser.error(f"--scene has an invalid range: {item}")
 
-        run_scenes.sort()
-        run_scenes = list(dict.fromkeys(run_scenes))
+                if not range_map[0].isdigit():
+                    parser.error(f"--scene has an invalid range: {item}")
+                if not range_map[1].isdigit():
+                    parser.error(f"--scene has an invalid range: {item}")
+
+                range_start = int(range_map[0])
+                range_end = int(range_map[1])
+
+                if range_start >= range_end:
+                    parser.error(f"--scene has an invalid range: {item} (start must be less then end)")
+
+                item_scenes[0] = list(range(range_start, range_end + 1))
+            elif processed_item.isdigit():
+                item_scenes[0] = [int(processed_item)]
+            else:
+                parser.error(f"--scene has an invalid item: {item}")
+
+            run_scenes.append(item_scenes)
 
         valid_scenes = [x["scene"] for x in metadata["scenes"] if x["scene_saved"] == True]
 
-        args.scenes = []
+        args.scenes = {}
         for scene in run_scenes:
-            if scene in valid_scenes:
-                args.scenes.append(scene)
-            else:
-                parser.error(f"--scene has an invalid id: {scene}")
+            for item in scene[0]:
+                if item in valid_scenes:
+                    if item in args.scenes:
+                        args.scenes[item][1] += scene[1]
+                    else:
+                        args.scenes[item] = [item, scene[1]]
+                else:
+                    parser.error(f"--scene has an invalid id: {item}")
+        args.scenes = list(args.scenes.values())
 
     return args
 

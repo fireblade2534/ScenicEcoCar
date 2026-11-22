@@ -49,76 +49,75 @@ def rerun_command(args: argparse.Namespace) -> int:
         generation_success_count = 0
 
         scene_results = []
-        total_scenes = len(args.scenes)
-        for index, scene_count in enumerate(args.scenes, start = 1):
-            logging.info(f"Starting loading and simulation for scene {scene_count}")
+        total_scenes = sum([scene[1] for scene in args.scenes])
+        index = 0
+        for (scene_count, repeat) in args.scenes:
+            for sub_index in range(1, repeat + 1):
+                index += 1
+                logging.debug(f"Starting loading and simulation for scene {scene_count}")
 
-            start_time = time.time()
-            logging.debug(f"Loading scene {scene_count}")
-            with open(os.path.join(args.scene_dir, f"scene_{scene_count}/scene.bin"), "rb") as file:
-                scene = scenario.sceneFromBytes(file.read())
+                start_time = time.time()
+                logging.debug(f"Loading scene {scene_count}")
+                with open(os.path.join(args.scene_dir, f"scene_{scene_count}/scene.bin"), "rb") as file:
+                    scene = scenario.sceneFromBytes(file.read())
 
-            scene.egoObject.rolename = "hero"
-                
-            for sensor in ego_car_sensors:
-                scene.egoObject.sensors[sensor.name] = copy.deepcopy(sensor)
+                scene.egoObject.rolename = "hero"
+                    
+                for sensor in ego_car_sensors:
+                    scene.egoObject.sensors[sensor.name] = copy.deepcopy(sensor)
 
-            total_time = time.time() - start_time
-            logging.debug(f"Loaded scene {scene_count} in {total_time:.4g} seconds")
+                total_time = time.time() - start_time
+                logging.debug(f"Loaded scene {scene_count} in {total_time:.4g} seconds")
 
-            start_time = time.time()
-            logging.debug(f"Beginning scene simulation for scene {scene_count}")
+                start_time = time.time()
+                logging.debug(f"Beginning scene simulation for scene {scene_count}")
 
-            simulation_result, passed_records, failed_records = run_simulation(
-                simulator,
-                scene,
-                max_steps = None,
-                name = str(scene_count),
-                verbosity = args.verbosity,
-                max_iterations = 1,
-                rtf = args.rtf
-            )
+                simulation_result, passed_records, failed_records = run_simulation(
+                    simulator,
+                    scene,
+                    max_steps = None,
+                    name = str(scene_count),
+                    verbosity = args.verbosity,
+                    max_iterations = 1,
+                    rtf = args.rtf
+                )
 
-            total_time = time.time() - start_time
-            logging.debug(f"Ran simulation for scene {scene_count} in {total_time:.4g} seconds")
+                total_time = time.time() - start_time
+                logging.debug(f"Ran simulation for scene {scene_count} in {total_time:.4g} seconds")
 
-            if simulation_result != SimulationResultType.INVALID:
-                generation_success_count += 1
-                if simulation_result == SimulationResultType.PASSED:
-                    passed_count += 1
+                if simulation_result != SimulationResultType.INVALID:
+                    generation_success_count += 1
+                    if simulation_result == SimulationResultType.PASSED:
+                        passed_count += 1
+                    else:
+                        failed_count += 1
                 else:
-                    failed_count += 1
-            else:
-                invalid_count += 1
+                    invalid_count += 1
 
-            scene_results.append(
-                {
-                    "scene": scene_count,
-                    "result": simulation_result.name,
-                    "passed_records": passed_records,
-                    "failed_records": failed_records,
-                    "scene_saved": False,
-                }
-            )
+                scene_results.append(
+                    {
+                        "index": index,
+                        "sub_index": sub_index,
+                        "max_index": repeat,
+                        "scene": scene_count,
+                        "result": simulation_result.name,
+                        "passed_records": passed_records,
+                        "failed_records": failed_records,
+                        "scene_saved": False,
+                    }
+                )
 
-            remaining_time = ((time.time() - loop_start_time) / index) * (len(args.scenes) - index)
-            logging.info(
-                f"[{index}/{total_scenes}] Scene {scene_count:03d} | P = {passed_count:03d} F = {failed_count:03d} I = {invalid_count:03d} | ETA {format_time(max(0, remaining_time))} "
-            )
+                remaining_time = ((time.time() - loop_start_time) / index) * (total_scenes - index)
+                logging.info(
+                    f"[{index}/{total_scenes}] Scene {scene_count:03d} ({sub_index}/{repeat}) | P = {passed_count:03d} F = {failed_count:03d} I = {invalid_count:03d} | ETA {format_time(max(0, remaining_time))} "
+                )
 
         logging.info("")
         
-        valid_scenes = 0
-        passed_scenes = 0
-        for scene_data in scene_results:
-            if scene_data["result"] != SimulationResultType.INVALID.name:
-                valid_scenes += 1
-
-                if scene_data["result"] == SimulationResultType.PASSED.name:
-                    passed_scenes += 1
+        valid_scenes = passed_count + failed_count
 
         if valid_scenes > 0:
-            passed_rate = (passed_scenes / valid_scenes) * 100
+            passed_rate = (passed_count / valid_scenes) * 100
             failed_rate = 100 - passed_rate
         else:
             passed_rate = 0.0
@@ -130,11 +129,11 @@ def rerun_command(args: argparse.Namespace) -> int:
             "=" * 40,
             "",
             f"Scenario: {args.scene_dir}",
-            f"Total Generated: {len(args.scenes)}",
+            f"Total Generated: {index}",
             "",
-            f"Passed: {passed_scenes} ({passed_rate:.1f}%)",
-            f"Failed: {valid_scenes - passed_scenes} ({failed_rate:.1f}%)",
-            f"Invalid: {len(args.scenes) - valid_scenes}",
+            f"Passed: {passed_count} ({passed_rate:.1f}%)",
+            f"Failed: {valid_scenes - passed_count} ({failed_rate:.1f}%)",
+            f"Invalid: {invalid_count}",
             "",
             "Scenes:"
         ]
@@ -142,18 +141,18 @@ def rerun_command(args: argparse.Namespace) -> int:
         for item in scene_results:
             if args.detailed_report == True:
                 report_text += [
-                    f"  Scene {item['scene']:03d}:",
+                    f"  Scene {item['scene']:03d} ({item['sub_index']}/{item['max_index']}):",
                     f"    Result: {item['result']}",
                     f"    Passed Records: [{', '.join(item['passed_records'])}]",
                     f"    Failed Records: [{', '.join(item['failed_records'])}]"
                 ]
             else:
-                report_text.append(f"  Scene {item['scene']:03d} - {item['result']}")
+                report_text.append(f"  Scene {item['scene']:03d} ({item['sub_index']}/{item['max_index']}) - {item['result']}")
 
         for line in report_text:
             logging.info(line)
 
-        if valid_scenes != passed_scenes or valid_scenes == 0:
+        if valid_scenes != passed_count or valid_scenes == 0:
             return 1
     
         return 0
