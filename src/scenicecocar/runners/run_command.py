@@ -247,7 +247,7 @@ def run_command(args: argparse.Namespace) -> int:
                     (loop_start_time + args.duration) - time.time()
                 )
 
-            remaining_text = f" | ETA {format_time(max(0, remaining_time))}" if remaining_time is not math.inf else ""
+            remaining_text = f" | ETA {format_time(max(0, remaining_time))}" if math.isfinite(remaining_time) else ""
                 
             logging.info(
                 f"[{', '.join(progresses)}] Scene {scene_count:03d} | {simulation_result.name} | P = {passed_count:03d} F = {failed_count:03d} I = {invalid_count:03d}{remaining_text}"
@@ -267,7 +267,7 @@ def run_command(args: argparse.Namespace) -> int:
                 if generation_success_count >= args.count:
                     logging.debug(f"Stopping at {scene_count} due to stop condition 'count' with varient successful generations")
                     break
-                elif scene_count > args.count * 10:
+                elif scene_count >= args.count * 10:
                     logging.debug(f"Stopping at {scene_count} due to stop condition 'count' with variant total generations")
                     break
 

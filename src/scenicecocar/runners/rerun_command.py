@@ -8,7 +8,7 @@ import scenic.core.errors as errors
 import logging
 from scenicecocar.tools.ego_config_parser import parse_ego_config
 from scenicecocar.tools.replay_fix import repair_scenario_globals
-from scenicecocar.tools.utility import SimulationResultType, run_simulation
+from scenicecocar.tools.utility import SimulationResultType, format_time, run_simulation
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +44,13 @@ def rerun_command(args: argparse.Namespace) -> int:
     logging.info(f"Simulator connected and configured")
 
     try:
+        loop_start_time = time.time()
+        
         generation_success_count = 0
 
         scene_results = []
         total_scenes = len(args.scenes)
-        for scene_count in args.scenes:
+        for index, scene_count in enumerate(args.scenes):
             logging.info(f"Starting loading and simulation for scene {scene_count}")
 
             start_time = time.time()
@@ -99,8 +101,9 @@ def rerun_command(args: argparse.Namespace) -> int:
                 }
             )
 
+            remaining_time = ((time.time() - loop_start_time) / index) * (len(args.scenes) - index)
             logging.info(
-                f"[{generation_success_count:0{len(str(total_scenes))}d}/{total_scenes}] Simulated Scene {scene_count:03d} | Passed = {passed_count:03d} Failed = {failed_count:03d} Invalid = {invalid_count:03d} | "
+                f"[{index}/{total_scenes}] Scene {scene_count:03d} | P = {passed_count:03d} F = {failed_count:03d} I = {invalid_count:03d} | ETA {format_time(max(0, remaining_time))} "
             )
 
         logging.info("")

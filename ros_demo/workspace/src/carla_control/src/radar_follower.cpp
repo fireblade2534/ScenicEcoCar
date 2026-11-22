@@ -11,8 +11,8 @@
 #include <string>
 
 class RadarFollower : public rclcpp::Node {
-
   static rclcpp::NodeOptions simOptions() {
+    // Configure this node to use the time published by the sim
     rclcpp::NodeOptions options;
     options.parameter_overrides({rclcpp::Parameter("use_sim_time", true)});
     return options;
@@ -24,6 +24,8 @@ public:
     gap_p = std::max(0.0, declare_parameter<double>("gap_p", 0.15));
     velocity_p = std::max(0.0, declare_parameter<double>("velocity_p", 0.3));
     
+
+    // Setup subscribers and publishers
     const auto radar_topic = declare_parameter<std::string>(
       "radar_topic", "/carla/hero/front_radar/point_cloud");
     radar_sub = create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -39,7 +41,6 @@ public:
 
 private:
   void onRadar(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-    // Find the ray that is clostest to the center of the sensors fov
     double closest_center_dist = std::numeric_limits<double>::infinity();
     double best_distance = std::numeric_limits<double>::infinity();
     double best_velocity = std::numeric_limits<double>::infinity();
@@ -50,9 +51,9 @@ private:
     sensor_msgs::PointCloud2ConstIterator<float> depth(*msg, "depth");
     sensor_msgs::PointCloud2ConstIterator<float> velocity(*msg, "velocity");
 
-    // Loop through each of the rays returned by the sensor
+    // Find the ray closest to the radar's forward axis
     for (; x != x.end(); ++x, ++y, ++z, ++depth, ++velocity) {
-      // Get the squared magnitude of the direction of the ray to the center of the radar
+      // Compare squared lateral/vertical offsets of the hit location
       double sensor_plane_distance = (*y * *y) + (*z * *z);
       if (sensor_plane_distance > closest_center_dist) {
         continue;
