@@ -6,6 +6,7 @@ from scenic.core.dynamics.guards import InvariantViolation
 import scenic.core.scenarios
 import scenic.core.simulators
 import scenic.core.errors as errors
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -97,3 +98,17 @@ def check_pass(simulation: scenic.core.simulators.Simulation) -> tuple[Simulatio
         return (SimulationResultType.FAILED, passed, failed)
     
     return (SimulationResultType.PASSED, passed, failed)
+
+def format_time(seconds: float) -> str:
+    minutes, sec = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    
+    parts = []
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    if sec or not parts:
+        parts.append(f"{sec}s")
+        
+    return " ".join(parts)

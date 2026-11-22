@@ -37,12 +37,17 @@ def rerun_command(args: argparse.Namespace) -> int:
     if os.path.isfile(ego_config_path):
         ego_car_sensors = parse_ego_config(ego_config_path)
 
+    passed_count = 0
+    failed_count = 0
+    invalid_count = 0
+
     logging.info(f"Simulator connected and configured")
 
     try:
         generation_success_count = 0
 
         scene_results = []
+        total_scenes = len(args.scenes)
         for scene_count in args.scenes:
             logging.info(f"Starting loading and simulation for scene {scene_count}")
 
@@ -77,6 +82,12 @@ def rerun_command(args: argparse.Namespace) -> int:
 
             if simulation_result != SimulationResultType.INVALID:
                 generation_success_count += 1
+                if simulation_result == SimulationResultType.PASSED:
+                    passed_count += 1
+                else:
+                    failed_count += 1
+            else:
+                invalid_count += 1
 
             scene_results.append(
                 {
@@ -86,6 +97,10 @@ def rerun_command(args: argparse.Namespace) -> int:
                     "failed_records": failed_records,
                     "scene_saved": False,
                 }
+            )
+
+            logging.info(
+                f"[{generation_success_count:0{len(str(total_scenes))}d}/{total_scenes}] Simulated Scene {scene_count:03d} | Passed = {passed_count:03d} Failed = {failed_count:03d} Invalid = {invalid_count:03d} | "
             )
 
         logging.info("")
@@ -124,13 +139,13 @@ def rerun_command(args: argparse.Namespace) -> int:
         for item in scene_results:
             if args.detailed_report == True:
                 report_text += [
-                    f"  Scene {item['scene']}:",
+                    f"  Scene {item['scene']:03d}:",
                     f"    Result: {item['result']}",
                     f"    Passed Records: [{', '.join(item['passed_records'])}]",
                     f"    Failed Records: [{', '.join(item['failed_records'])}]"
                 ]
             else:
-                report_text.append(f"  Scene {item['scene']} - {item['result']}")
+                report_text.append(f"  Scene {item['scene']:03d} - {item['result']}")
 
         for line in report_text:
             logging.info(line)

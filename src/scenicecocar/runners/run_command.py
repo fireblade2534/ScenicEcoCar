@@ -1,6 +1,7 @@
 import copy
 from datetime import datetime
 import json
+import math
 import os
 import shutil
 import sys
@@ -16,7 +17,7 @@ import scenic.syntax.translator as translator
 from scenic.core.errors import InvalidScenarioError
 
 from scenicecocar.tools.ego_config_parser import parse_ego_config
-from scenicecocar.tools.utility import SimulationResultType, is_failed_type, is_passed_type, run_simulation
+from scenicecocar.tools.utility import SimulationResultType, format_time, is_failed_type, is_passed_type, run_simulation
 
 logger = logging.getLogger(__name__)
 
@@ -138,11 +139,13 @@ def run_command(args: argparse.Namespace) -> int:
         scene_count = 0
         generation_success_count = 0
 
+        passed_count = 0
+        failed_count = 0
+        invalid_count = 0
+
         scene_results = []
         while True:
             scene_count += 1
-
-            logging.info(f"Running generation and simulation for scene {scene_count}")
 
             start_time = time.time()
             logging.debug(f"Generating scene {scene_count}")
@@ -158,9 +161,16 @@ def run_command(args: argparse.Namespace) -> int:
 
             scene_data = scenario.sceneToBytes(scene)
 
-            total_time = time.time() - start_time
-            logging.debug(f"Generated scene {scene_count} in {iterations} iterations and {total_time:.4g} seconds")
+            generation_total_time = time.time() - start_time
+            logging.debug(f"Generated scene {scene_count} in {iterations} iterations and {generation_total_time:.4g} seconds")
 
+            if args.save_scenes:
+                logging.debug(f"Saving latest generated scene")
+
+                with open(os.path.join(base_folder_name, "latest.bin"), "wb") as file:
+                    file.write(scene_data)
+
+                logging.debug(f"Saved latest generated scene")
 
             start_time = time.time()
             logging.debug(f"Beginning scene simulation for scene {scene_count}")
@@ -175,11 +185,17 @@ def run_command(args: argparse.Namespace) -> int:
                 rtf = args.rtf
             )
 
-            total_time = time.time() - start_time
-            logging.debug(f"Ran simulation for scene {scene_count} in {total_time:.4g} seconds")
+            simulation_total_time = time.time() - start_time
+            logging.debug(f"Ran simulation for scene {scene_count} in {simulation_total_time:.4g} seconds")
 
             if simulation_result != SimulationResultType.INVALID:
                 generation_success_count += 1
+                if simulation_result == SimulationResultType.PASSED:
+                    passed_count += 1
+                else:
+                    failed_count += 1
+            else:
+                invalid_count += 1
 
             scene_saved = args.save_scenes == True and simulation_result.name.lower() in args.save_groups
 
@@ -189,6 +205,8 @@ def run_command(args: argparse.Namespace) -> int:
                     "result": simulation_result.name,
                     "passed_records": passed_records,
                     "failed_records": failed_records,
+                    "generation_time": generation_total_time,
+                    "simulation_time": simulation_total_time,
                     "scene_saved": scene_saved,
                 }
             )
@@ -216,6 +234,24 @@ def run_command(args: argparse.Namespace) -> int:
                 )
 
                 logging.debug("Saved updated run metadata")
+
+            progresses = []
+            remaining_time = math.inf
+            if "count" in args.stop_conditions:
+                progresses.append(f"{generation_success_count}/{args.count}")
+                remaining_time = ((time.time() - loop_start_time) / scene_count) * (args.count - generation_success_count)
+            if "duration" in args.stop_conditions:
+                progresses.append(f"{format_time(time.time() - loop_start_time)}/{format_time(args.duration)}")
+                remaining_time = min(
+                    remaining_time,
+                    (loop_start_time + args.duration) - time.time()
+                )
+
+            remaining_text = f" | ETA {format_time(max(0, remaining_time))}" if remaining_time is not math.inf else ""
+                
+            logging.info(
+                f"[{', '.join(progresses)}] Scene {scene_count:03d} | {simulation_result.name} | P = {passed_count:03d} F = {failed_count:03d} I = {invalid_count:03d}{remaining_text}"
+            )
 
             if "first-failed" in args.stop_conditions and simulation_result == SimulationResultType.FAILED:
                 logging.debug(f"Stopping at {scene_count} due to stop condition 'first-failed'")
@@ -298,14 +334,14 @@ def run_command(args: argparse.Namespace) -> int:
 
             if args.detailed_report == True:
                 report_text += [
-                    f"  Scene {item['scene']}:",
+                    f"  Scene {item['scene']:03d}:",
                     f"    Result: {item['result']}",
                     f"    Saved: {item['scene_saved']}",
                     f"    Passed Records: [{', '.join(item['passed_records'])}]",
                     f"    Failed Records: [{', '.join(item['failed_records'])}]"
                 ]
             else:
-                report_text.append(f"  Scene {item['scene']} - {item['result']}")            
+                report_text.append(f"  Scene {item['scene']:03d} - {item['result']}")            
 
         for line in report_text:
             logging.info(line)
