@@ -22,7 +22,7 @@ public:
   RadarFollower() : Node("radar_follower", simOptions()) {
     gap = std::max(1.0, declare_parameter<double>("target_gap", 5.0));
     gap_p = std::max(0.0, declare_parameter<double>("gap_p", 0.15));
-    velocity_p = std::max(0.0, declare_parameter<double>("velocity_p", 0.3));
+    gap_d = std::max(0.0, declare_parameter<double>("gap_d", 0.3));
     
 
     // Setup subscribers and publishers
@@ -73,8 +73,8 @@ private:
       double distance_error = best_distance - gap;
       double velocity_error = best_velocity;
 
-      // Effectively two P controllers. One tries to maintain distance, and the other tries to match the speed of the lead car
-      control_output = (distance_error * gap_p) + (velocity_error * velocity_p);
+      // A very simple PD controller using the distance as the P and the radial velocity as the D
+      control_output = (distance_error * gap_p) + (velocity_error * gap_d);
     }
 
     // Throttle forward if positive, brake if negative (This is good enough for this simple demo but it does prevent the car from moving backward)
@@ -95,7 +95,7 @@ private:
 
   double gap = 5.0;
   double gap_p = 0.1;
-  double velocity_p = 0.2;
+  double gap_d = 0.2;
 
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr radar_sub;
   rclcpp::Publisher<carla_msgs::msg::CarlaEgoVehicleControl>::SharedPtr control_pub;

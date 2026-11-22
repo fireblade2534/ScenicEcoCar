@@ -50,7 +50,7 @@ def rerun_command(args: argparse.Namespace) -> int:
 
         scene_results = []
         total_scenes = len(args.scenes)
-        for index, scene_count in enumerate(args.scenes):
+        for index, scene_count in enumerate(args.scenes, start = 1):
             logging.info(f"Starting loading and simulation for scene {scene_count}")
 
             start_time = time.time()

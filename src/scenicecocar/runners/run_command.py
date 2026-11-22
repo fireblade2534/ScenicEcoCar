@@ -361,7 +361,7 @@ def run_command(args: argparse.Namespace) -> int:
 
             logging.debug("Saved run metadata")
 
-        if "count" in args.stop_conditions and scene_count > args.count * 10:
+        if "count" in args.stop_conditions and scene_count >= args.count * 10:
             return 1
     
         if passed_scenes != valid_scenes or valid_scenes == 0:
