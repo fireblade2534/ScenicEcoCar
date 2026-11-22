@@ -20,8 +20,8 @@ class RadarFollower : public rclcpp::Node {
 
 public:
   RadarFollower() : Node("radar_follower", simOptions()) {
-    gap = std::max(1.0, declare_parameter<double>("target_gap", 5.0));
-    gap_p = std::max(0.0, declare_parameter<double>("gap_p", 0.15));
+    gap = std::max(1.0, declare_parameter<double>("target_gap", 7.0));
+    gap_p = std::max(0.0, declare_parameter<double>("gap_p", 0.2));
     gap_d = std::max(0.0, declare_parameter<double>("gap_d", 0.3));
     
 
