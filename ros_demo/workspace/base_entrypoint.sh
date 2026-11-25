@@ -18,6 +18,7 @@ fi
 cd /workspace
 echo "=== Starting Foxglove Bridge ==="
 nohup ros2 launch foxglove_bridge foxglove_bridge_launch.xml \
+    use_sim_time:=true \
     > /tmp/foxglove.log 2>&1 < /dev/null &
 
 echo $! > /tmp/foxglove.pid

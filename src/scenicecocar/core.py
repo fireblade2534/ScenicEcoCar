@@ -105,6 +105,17 @@ def build_parser():
         help = "save scenes depending on their status"
     )
     run.add_argument(
+        "--record-ros2",
+        action = "store_true",
+        help = "record ros2 using foxglove",
+    )
+    run.add_argument(
+        "--record-url",
+        default = "ws://localhost:8765",
+        help = "record ros2 using foxglove",
+        metavar = "FILE"
+    )
+    run.add_argument(
         "--scenario",
         default = None,
         help = "name of scenario to run (if file contains multiple)"

@@ -16,6 +16,7 @@ import scenic.core.scenarios
 import scenic.syntax.translator as translator
 from scenic.core.errors import InvalidScenarioError
 
+from scenicecocar.recorders.foxglove import FoxgloveRecorder
 from scenicecocar.tools.ego_config_parser import parse_ego_config
 from scenicecocar.tools.utility import SimulationResultType, format_time, is_failed_type, is_passed_type, run_simulation
 
@@ -131,6 +132,12 @@ def run_command(args: argparse.Namespace) -> int:
 
             logging.info(f"Saved initial run data ")
 
+        if args.record_ros2:
+            recorder = FoxgloveRecorder(
+                url = args.record_url,
+                output_path = os.path.join(base_folder_name, "latest.mcap")
+            )
+
     
         logging.info("Beginning scene generation and simulation")
 
@@ -175,15 +182,23 @@ def run_command(args: argparse.Namespace) -> int:
             start_time = time.time()
             logging.debug(f"Beginning scene simulation for scene {scene_count}")
 
-            simulation_result, passed_records, failed_records = run_simulation(
-                simulator,
-                scene,
-                max_steps = None,
-                name = str(scene_count),
-                verbosity = args.verbosity,
-                max_iterations = 1,
-                rtf = args.rtf
-            )
+            
+            try:
+                if args.record_ros2:
+                    recorder.start()
+
+                simulation_result, passed_records, failed_records = run_simulation(
+                    simulator,
+                    scene,
+                    max_steps = None,
+                    name = str(scene_count),
+                    verbosity = args.verbosity,
+                    max_iterations = 1,
+                    rtf = args.rtf
+                )
+            finally:
+                if args.record_ros2:
+                    recorder.stop()
 
             simulation_total_time = time.time() - start_time
             logging.debug(f"Ran simulation for scene {scene_count} in {simulation_total_time:.4g} seconds")
@@ -220,6 +235,11 @@ def run_command(args: argparse.Namespace) -> int:
 
                 with open(os.path.join(save_folder, "scene.bin"), "wb") as file:
                     file.write(scene_data)
+
+                shutil.move(
+                    os.path.join(base_folder_name, "latest.mcap"),
+                    os.path.join(save_folder, "scene.mcap")
+                )
 
                 logging.debug(f"Saved scene {scene_count} at {save_folder}")
 
