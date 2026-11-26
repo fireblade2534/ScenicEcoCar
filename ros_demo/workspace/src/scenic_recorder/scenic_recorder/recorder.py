@@ -37,7 +37,7 @@ class Recorder(Node):
         self.keep_alive_timer = self.create_timer(0.2, self.keep_alive, clock = self.steady_clock)
 
         self.record_timeout = record_timeout
-        self.last_keep_alive = time.time()
+        self.last_keep_alive = time.monotonic()
 
     def _subscribe(self, topic: str, type_name: str):
         if topic in self.subs:
@@ -74,14 +74,14 @@ class Recorder(Node):
         if self.writer is None:
             return
         
-        time_diff = time.time() - self.last_keep_alive
+        time_diff = time.monotonic() - self.last_keep_alive
 
         if time_diff > self.record_timeout:
             self.get_logger().warning(f"Keep alive timed out: Stopping recording")
             self.stop_recording()
 
     def keep_alive_ping(self):
-        self.last_keep_alive = time.time()
+        self.last_keep_alive = time.monotonic()
 
     def discover(self):
         with self.lock:
@@ -104,7 +104,7 @@ class Recorder(Node):
                 raise ValueError("Already recording")
 
             self.file_complete = False
-            self.last_keep_alive = time.time()
+            self.keep_alive_ping()
 
             if os.path.isdir(self.bag_path):
                 shutil.rmtree(self.bag_path)
@@ -242,11 +242,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix="scenic-ros-") as directory:
         node = Recorder(directory)
 
-        server = HTTPServer(("0.0.0.0", 8769), Handler)
+        server = HTTPServer(("127.0.0.1", 8769), Handler)
         server.recorder = node
         worker = threading.Thread(target = server.serve_forever, daemon = True)
         worker.start()
-        node.get_logger().info(f"Recorder on http://0.0.0.0:8769; bag_path: {node.bag_path}")
+        node.get_logger().info(f"Recorder on http://127.0.0.1:8769; bag_path: {node.bag_path}")
         try:
             rclpy.spin(node)
         except (KeyboardInterrupt, ExternalShutdownException):

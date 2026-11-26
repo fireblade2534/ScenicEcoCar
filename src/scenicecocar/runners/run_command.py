@@ -208,9 +208,7 @@ def run_command(args: argparse.Namespace) -> int:
             finally:
                 if args.record_ros2:
                     stop.set()
-
                     recorder.stop()
-                    recorder.save(os.path.join(base_folder_name, "latest.mcap"))
 
             simulation_total_time = time.time() - start_time
             logging.debug(f"Ran simulation for scene {scene_count} in {simulation_total_time:.4g} seconds")
@@ -248,10 +246,8 @@ def run_command(args: argparse.Namespace) -> int:
                 with open(os.path.join(save_folder, "scene.bin"), "wb") as file:
                     file.write(scene_data)
 
-                shutil.move(
-                    os.path.join(base_folder_name, "latest.mcap"),
-                    os.path.join(save_folder, "scene.mcap")
-                )
+                if args.record_ros2:
+                    recorder.save(os.path.join(save_folder, "scene.mcap"))
 
                 logging.debug(f"Saved scene {scene_count} at {save_folder}")
 
