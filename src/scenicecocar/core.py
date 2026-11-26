@@ -107,12 +107,12 @@ def build_parser():
     run.add_argument(
         "--record-ros2",
         action = "store_true",
-        help = "record ros2 using foxglove",
+        help = "record ros2",
     )
     run.add_argument(
         "--record-url",
-        default = "ws://localhost:8765",
-        help = "record ros2 using foxglove",
+        default = "http://localhost:8769",
+        help = "record ros2 url",
         metavar = "FILE"
     )
     run.add_argument(

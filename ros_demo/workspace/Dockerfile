@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-kilted-geometry-msgs \
     ros-kilted-diagnostic-msgs \
     ros-kilted-foxglove-bridge \
+    ros-kilted-rosbag2 \
+    ros-kilted-rosbag2-py \
+    ros-kilted-rosbag2-storage-mcap \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/carla_ws/src

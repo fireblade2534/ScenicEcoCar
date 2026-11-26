@@ -5,6 +5,7 @@ import math
 import os
 import shutil
 import sys
+import threading
 import time
 import scenic
 import dill
@@ -16,7 +17,7 @@ import scenic.core.scenarios
 import scenic.syntax.translator as translator
 from scenic.core.errors import InvalidScenarioError
 
-from scenicecocar.recorders.foxglove import FoxgloveRecorder
+from scenicecocar.recorders.native_ros import ROSRecorder
 from scenicecocar.tools.ego_config_parser import parse_ego_config
 from scenicecocar.tools.utility import SimulationResultType, format_time, is_failed_type, is_passed_type, run_simulation
 
@@ -133,10 +134,11 @@ def run_command(args: argparse.Namespace) -> int:
             logging.info(f"Saved initial run data ")
 
         if args.record_ros2:
-            recorder = FoxgloveRecorder(
+            recorder = ROSRecorder(
                 url = args.record_url,
-                output_path = os.path.join(base_folder_name, "latest.mcap")
             )
+
+            recorder.precreate_sensor_topics(ego_car_sensors, parent_name = "hero")
 
     
         logging.info("Beginning scene generation and simulation")
@@ -185,6 +187,13 @@ def run_command(args: argparse.Namespace) -> int:
             
             try:
                 if args.record_ros2:
+                    stop = threading.Event()
+
+                    def keep_alive():
+                        while not stop.wait(2):
+                            recorder.keep_alive_ping()
+
+                    threading.Thread(target = keep_alive, daemon = True).start()
                     recorder.start()
 
                 simulation_result, passed_records, failed_records = run_simulation(
@@ -198,7 +207,10 @@ def run_command(args: argparse.Namespace) -> int:
                 )
             finally:
                 if args.record_ros2:
+                    stop.set()
+
                     recorder.stop()
+                    recorder.save(os.path.join(base_folder_name, "latest.mcap"))
 
             simulation_total_time = time.time() - start_time
             logging.debug(f"Ran simulation for scene {scene_count} in {simulation_total_time:.4g} seconds")
@@ -392,6 +404,12 @@ def run_command(args: argparse.Namespace) -> int:
         pass
     finally:
         simulator.destroy()
+
+        if args.record_ros2:
+            try:
+                recorder.stop()
+            except Exception:
+                pass
 
     return 2
     
