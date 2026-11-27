@@ -32,6 +32,7 @@ def rerun_command(args: argparse.Namespace) -> int:
 
     simulator.render = args.render
 
+    # Parse the ego car config
     ego_car_sensors = []
     ego_config_path = os.path.join(args.scene_dir, "ego_config.yaml")
     if os.path.isfile(ego_config_path):
@@ -52,6 +53,7 @@ def rerun_command(args: argparse.Namespace) -> int:
         total_scenes = sum([scene[1] for scene in args.scenes])
         index = 0
         for (scene_count, repeat) in args.scenes:
+            # Repeat each scene the specified number of times
             for sub_index in range(1, repeat + 1):
                 index += 1
                 logging.debug(f"Starting loading and simulation for scene {scene_count}")
@@ -61,8 +63,8 @@ def rerun_command(args: argparse.Namespace) -> int:
                 with open(os.path.join(args.scene_dir, f"scene_{scene_count}/scene.bin"), "rb") as file:
                     scene = scenario.sceneFromBytes(file.read())
 
+                # Ensure the ego car has the rolename hero and add our ego car sensors to the list of sensors managed by scenic
                 scene.egoObject.rolename = "hero"
-                    
                 for sensor in ego_car_sensors:
                     scene.egoObject.sensors[sensor.name] = copy.deepcopy(sensor)
 

@@ -203,6 +203,7 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         if args.ego_car_config is not None and not os.path.isfile(args.ego_car_config):
             parser.error("--ego-car-config requires a path to a existing file")
 
+        # Check if there are hard stop conditions that guarantee the program will eventually stop
         hard_stop_present = False
         for condition in ["count", "duration"]:
             if condition in args.stop_conditions:
@@ -212,25 +213,29 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         if not hard_stop_present:
             any_defined = False
 
+            # If count is defined assume the user would want count to be enforced
             if args.count > 0:
                 args.stop_conditions.append("count")
                 any_defined = True
                 logger.info("No hard stop-conditions provided and count is defined: adding 'count' as a stop condition")
 
+            # If duration is defined assume the user would want duration to be enforced
             if args.duration > 0:
                 args.stop_conditions.append("duration")
                 any_defined = True
                 logger.info("No hard stop-conditions provided and duration is defined: adding 'duration' as a stop condition")
 
+            # If neither count nor duration is defined add duration as a default hard limit
             if any_defined == False:
 
+                # If stop conditions is completely empty, also add first-failed as a stop condition 
                 added_first_failed = ""
                 if len(args.stop_conditions) == 0:
                     added_first_failed = " 'first-failed' and"
                     args.stop_conditions.append("first-failed")
 
                 args.stop_conditions.append("duration")
-                args.duration = 3600
+                args.duration = 600
 
                 logger.info(f"No hard stop-conditions provided: adding{added_first_failed} 'duration' as stop condition (the duration is set to 60 minutes)")
 
@@ -252,6 +257,7 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         if args.save_scenes == False and len(args.save_groups) != 0:
             logger.warning("Save-groups is defined but save-scenes is false")
 
+        # If we want to filter the report but no filters are provided use the save groups if they exist or assume we want to filter to failed only
         if args.filter_report == True and len(args.report_groups) == 0:
             if len(args.save_groups) != 0 and args.save_scenes:
                 args.report_groups = args.save_groups
@@ -259,6 +265,12 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
             else:
                 args.report_groups = ["failed"]
 
+        # Warn and disable ros2 logging if saving scenes is false as there is no point wasting compute on recording
+        if args.record_ros2 == True and args.save_scenes == False:
+            args.record_ros2 = False
+            logger.warning("Record-ros2 is true but save-scenes is false: disabling record-ros2")
+
+        # Give save groups its default of failed
         if len(args.save_groups) == 0:
             args.save_groups = ["failed"]
 
@@ -269,35 +281,48 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         with open(os.path.join(args.scene_dir, "metadata.json"), "r") as file:
             metadata = json.load(file)
 
-        
+        # By default simply run all scenes
         if len(args.scenes) == 0:
             args.scenes.append("all")
             logger.info("No scenes provided: running all saved scenes")
 
         run_scenes = []
-
+        # Parse the requested scenes
         for item in args.scenes:
-            item_scenes = [[], 1]
+            item_scenes = [[], 1] # [scenes, # of repetitions]
 
+            # Handle multipliers in requested scenes
             processed_item = item
             if "x" in item:
                 multiplier_map = item.split("x")
+
+                # Multipliers should be of the format {any}x{number}
                 if len(multiplier_map) != 2:
                     parser.error(f"--scene has an invalid multiplier: {item}")
-
                 if not multiplier_map[1].isdigit():
                     parser.error(f"--scene has an invalid multiplier: {item}")
 
-                item_scenes[1] = int(multiplier_map[1])
+                multiplier = int(multiplier_map[1])
+
+                # Check that the multiplier number is valid
+                if multiplier <= 0:
+                    parser.error(f"--scene has an invalid multiplier: {item}")
+
+                item_scenes[1] = multiplier
+
+                # Remove the multiplier from the string to make it easier
                 processed_item = multiplier_map[0]
 
             if processed_item == "all":
+                # If the item is all simply add all saved scenes
                 for scene in metadata["scenes"]:
                     if scene["scene_saved"] == True:
                         item_scenes[0].append(scene["scene"])
             elif "-" in processed_item:
+                # If the item is a range get the min and max
                 range_map = processed_item.split("-")
 
+                # Ranges should be of the format {number}-{number}
                 if len(range_map) != 2:
                     parser.error(f"--scene has an invalid range: {item}")
 
@@ -309,9 +334,11 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
                 range_start = int(range_map[0])
                 range_end = int(range_map[1])
 
+                # Validate ordering
                 if range_start >= range_end:
                     parser.error(f"--scene has an invalid range: {item} (start must be less then end)")
 
+                # Add scenes inclusive
                 item_scenes[0] = list(range(range_start, range_end + 1))
             elif processed_item.isdigit():
                 item_scenes[0] = [int(processed_item)]
@@ -320,18 +347,25 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
 
             run_scenes.append(item_scenes)
 
+        # Get a simple list of which scenes were saved
         valid_scenes = [x["scene"] for x in metadata["scenes"] if x["scene_saved"] == True]
 
+        # Combine all of the scene requests and their multipliers into a first seen ordered dict
+        # Eg: [multiple scenes, # of repetitions] -> {unique scene: [unique scene, # of repetitions]}
         args.scenes = {}
         for scene in run_scenes:
             for item in scene[0]:
+                # Check if the requested scene was actually saved
                 if item in valid_scenes:
+                    # Create or accumulate the multiplier 
                     if item in args.scenes:
                         args.scenes[item][1] += scene[1]
                     else:
                         args.scenes[item] = [item, scene[1]]
                 else:
                     parser.error(f"--scene has an invalid id: {item}")
+
+        # The dict was simply for ease of checking existance so convert the dict into a list by removing all its keys
         args.scenes = list(args.scenes.values())
 
     return args

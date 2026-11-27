@@ -15,49 +15,12 @@ import scenic.core
 import scenic.core.errors as errors
 import scenic.core.scenarios
 import scenic.syntax.translator as translator
-from scenic.core.errors import InvalidScenarioError
 
 from scenicecocar.recorders.native_ros import ROSRecorder
 from scenicecocar.tools.ego_config_parser import parse_ego_config
-from scenicecocar.tools.utility import SimulationResultType, format_time, is_failed_type, is_passed_type, run_simulation
+from scenicecocar.tools.utility import SimulationResultType, format_time, run_simulation, validateTestRecords
 
 logger = logging.getLogger(__name__)
-
-def validateTestRecords(scenerio: scenic.core.scenarios.Scenario) -> bool:
-    failed_seen = set()
-    passed_seen = set()
-
-    for record in scenerio.recordedFinalExprs:
-        if is_passed_type(record.name) == True:
-            if record.name in passed_seen:
-                raise InvalidScenarioError(f"Only one `{record.name}` record final is allowed")
-            passed_seen.add(record.name)
-
-        if is_failed_type(record.name) == True:
-            if record.name in failed_seen:
-                raise InvalidScenarioError(f"Only one `{record.name}` record final is allowed")
-            failed_seen.add(record.name)
-    
-    if len(passed_seen) == 0:
-        raise InvalidScenarioError("A `PASSED` record final is required")
-    
-    for record in scenerio.recordedExprs:
-        if is_passed_type(record.name) == True:
-            raise InvalidScenarioError(f"The `{record.name}` record can only be a record final")
-
-        if is_failed_type(record.name) == True:
-            if record.name in failed_seen:
-                raise InvalidScenarioError(f"Only one `{record.name}` record is allowed")
-            failed_seen.add(record.name)
-
-    for record in scenerio.recordedInitialExprs:
-        if is_passed_type(record.name) == True:
-            raise InvalidScenarioError(f"The `{record.name}` record can only be a record final")
-
-        if is_failed_type(record.name) == True:
-            raise InvalidScenarioError(f"The `{record.name}` record cannot be a record initial")
-        
-    return True
 
 def run_command(args: argparse.Namespace) -> int:
     params = {}
@@ -77,6 +40,7 @@ def run_command(args: argparse.Namespace) -> int:
     start_time = time.time()
     logging.info("Beginning scenario construction")
 
+    # Construct the scenerio from the scenic file
     scenario = errors.callBeginningScenicTrace(
         lambda: translator.scenarioFromFile(
             args.scenic_file,
@@ -86,6 +50,7 @@ def run_command(args: argparse.Namespace) -> int:
         )
     )
 
+    # Validate if the scenic file has passed and optionally failed records
     errors.callBeginningScenicTrace(
         lambda: validateTestRecords(scenario)
     )
@@ -100,6 +65,7 @@ def run_command(args: argparse.Namespace) -> int:
 
     simulator.render = args.render
 
+    # Parse the ego car config
     ego_car_sensors = []
     if args.ego_car_config:
         ego_car_sensors = parse_ego_config(args.ego_car_config)
@@ -107,8 +73,8 @@ def run_command(args: argparse.Namespace) -> int:
     logging.info(f"Simulator connected and configured")
 
     try:
+        # Create the folder structure and save inital files if saving scenes is enabled
         if args.save_scenes:
-
             run_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
             if args.run_name is not None:
                 run_name = args.run_name.strip()
@@ -128,6 +94,7 @@ def run_command(args: argparse.Namespace) -> int:
                 "command": sys.argv.copy()
             }
 
+            # Dump the scenerio object as it is needed for reruns
             with open(os.path.join(base_folder_name, "scenerio.bin"), "wb") as file:
                 dill.dump(scenario, file)
 
@@ -138,6 +105,7 @@ def run_command(args: argparse.Namespace) -> int:
                 url = args.record_url,
             )
 
+            # Precreate sensor topics so that we don't miss any inital data in the simulation caused by it taking time to discover new topics
             recorder.precreate_sensor_topics(ego_car_sensors, parent_name = "hero")
 
     
@@ -163,12 +131,12 @@ def run_command(args: argparse.Namespace) -> int:
                 lambda: scenario.generate(maxIterations=2000, verbosity=args.verbosity)
             )
 
+            # Ensure the ego car has the rolename hero and add our ego car sensors to the list of sensors managed by scenic
             scene.egoObject.rolename = "hero"
-
             for sensor in ego_car_sensors:
                 scene.egoObject.sensors[sensor.name] = copy.deepcopy(sensor)
 
-            scene_data = scenario.sceneToBytes(scene)
+            scene_raw_data = scenario.sceneToBytes(scene)
 
             generation_total_time = time.time() - start_time
             logging.debug(f"Generated scene {scene_count} in {iterations} iterations and {generation_total_time:.4g} seconds")
@@ -176,24 +144,26 @@ def run_command(args: argparse.Namespace) -> int:
             if args.save_scenes:
                 logging.debug(f"Saving latest generated scene")
 
+                # To rerun a specific scene we also need to save data that specifies any random values
                 with open(os.path.join(base_folder_name, "latest.bin"), "wb") as file:
-                    file.write(scene_data)
+                    file.write(scene_raw_data)
 
                 logging.debug(f"Saved latest generated scene")
 
             start_time = time.time()
             logging.debug(f"Beginning scene simulation for scene {scene_count}")
 
-            
             try:
+                # Start the ros recorder
                 if args.record_ros2:
+                    # Start a keep alive thread that must be pinging the recorder to prevent it from automatically stoping the recording
                     stop = threading.Event()
-
                     def keep_alive():
                         while not stop.wait(2):
                             recorder.keep_alive_ping()
-
                     threading.Thread(target = keep_alive, daemon = True).start()
+
+                    # Start the actual recorder
                     recorder.start()
 
                 simulation_result, passed_records, failed_records = run_simulation(
@@ -207,12 +177,14 @@ def run_command(args: argparse.Namespace) -> int:
                 )
             finally:
                 if args.record_ros2:
+                    # Stop the keep alive thread and the recorder
                     stop.set()
                     recorder.stop()
 
             simulation_total_time = time.time() - start_time
             logging.debug(f"Ran simulation for scene {scene_count} in {simulation_total_time:.4g} seconds")
 
+            # Update the simulation counts
             if simulation_result != SimulationResultType.INVALID:
                 generation_success_count += 1
                 if simulation_result == SimulationResultType.PASSED:
@@ -224,6 +196,7 @@ def run_command(args: argparse.Namespace) -> int:
 
             scene_saved = args.save_scenes == True and simulation_result.name.lower() in args.save_groups
 
+            # Update metadata
             scene_results.append(
                 {
                     "scene": scene_count,
@@ -244,13 +217,15 @@ def run_command(args: argparse.Namespace) -> int:
                 os.mkdir(save_folder)
 
                 with open(os.path.join(save_folder, "scene.bin"), "wb") as file:
-                    file.write(scene_data)
+                    file.write(scene_raw_data)
 
+                # Get and save the mcap file from the ros recorder
                 if args.record_ros2:
                     recorder.save(os.path.join(save_folder, "scene.mcap"))
 
                 logging.debug(f"Saved scene {scene_count} at {save_folder}")
 
+            # Update the saved metadata for the scene regardless of if the full scene data should be saved
             if args.save_scenes:
                 logging.debug("Saving updated run metadata")
 
@@ -263,6 +238,7 @@ def run_command(args: argparse.Namespace) -> int:
 
                 logging.debug("Saved updated run metadata")
 
+            # Get the completion text for the progress bar and get the minimum of the estimated remaning times
             progresses = []
             remaining_time = math.inf
             if "count" in args.stop_conditions:
@@ -281,6 +257,7 @@ def run_command(args: argparse.Namespace) -> int:
                 f"[{', '.join(progresses)}] Scene {scene_count:03d} | {simulation_result.name} | P = {passed_count:03d} F = {failed_count:03d} I = {invalid_count:03d}{remaining_text}"
             )
 
+            # Check the first-* stop conditions
             if "first-failed" in args.stop_conditions and simulation_result == SimulationResultType.FAILED:
                 logging.debug(f"Stopping at {scene_count} due to stop condition 'first-failed'")
                 break
@@ -291,14 +268,17 @@ def run_command(args: argparse.Namespace) -> int:
                 logging.debug(f"Stopping at {scene_count} due to stop condition 'first-invalid'")
                 break
 
+            # Check the count stop condition
             if "count" in args.stop_conditions:
                 if generation_success_count >= args.count:
                     logging.debug(f"Stopping at {scene_count} due to stop condition 'count' with varient successful generations")
                     break
+                # Hardcode a limit to the number of both sucessful and unsccessful generations
                 elif scene_count >= args.count * 10:
                     logging.debug(f"Stopping at {scene_count} due to stop condition 'count' with variant total generations")
                     break
 
+            # Check the duration stop condition
             if "duration" in args.stop_conditions:
                 spent_time = time.time() - loop_start_time
                 
@@ -308,22 +288,16 @@ def run_command(args: argparse.Namespace) -> int:
 
         logging.info("")
 
-        valid_scenes = 0
-        passed_scenes = 0
-        for scene_data in scene_results:
-            if scene_data["result"] != SimulationResultType.INVALID.name:
-                valid_scenes += 1
+        valid_count = passed_count + failed_count
 
-                if scene_data["result"] == SimulationResultType.PASSED.name:
-                    passed_scenes += 1
-
-        if valid_scenes > 0:
-            passed_rate = (passed_scenes / valid_scenes) * 100
+        if valid_count > 0:
+            passed_rate = (passed_count / valid_count) * 100
             failed_rate = 100 - passed_rate
         else:
             passed_rate = 0.0
             failed_rate = 0.0
 
+        # Construct the report a list of individual lines
         report_text = [
             "=" * 40,
             "Scenic Test Report",
@@ -349,13 +323,14 @@ def run_command(args: argparse.Namespace) -> int:
         report_text += [
             f"Total Generated: {scene_count}",
             "",
-            f"Passed: {passed_scenes} ({passed_rate:.1f}%)",
-            f"Failed: {valid_scenes - passed_scenes} ({failed_rate:.1f}%)",
-            f"Invalid: {scene_count - valid_scenes}",
+            f"Passed: {passed_count} ({passed_rate:.1f}%)",
+            f"Failed: {failed_count} ({failed_rate:.1f}%)",
+            f"Invalid: {scene_count - valid_count}",
             "",
             "Scenes:"
         ]
 
+        # Output either a default 
         for item in scene_results:
             if args.filter_report and item['result'].lower() not in args.report_groups:
                 continue
@@ -374,6 +349,7 @@ def run_command(args: argparse.Namespace) -> int:
         for line in report_text:
             logging.info(line)
 
+        # Save the final metadata and report text
         if args.save_scenes:
             logging.debug("Saving run metadata")
 
@@ -392,13 +368,14 @@ def run_command(args: argparse.Namespace) -> int:
         if "count" in args.stop_conditions and scene_count >= args.count * 10:
             return 1
     
-        if passed_scenes != valid_scenes or valid_scenes == 0:
+        if passed_count != valid_count or valid_count == 0:
             return 1
     
         return 0 
     except KeyboardInterrupt:
         pass
     finally:
+        # Make sure to cleanup and stop any recordings
         simulator.destroy()
 
         if args.record_ros2:

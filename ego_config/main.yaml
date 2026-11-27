@@ -92,4 +92,4 @@ sensors:
       lower_fov: -25.5
       horizontal_fov: 360.0
       rotation_frequency: 20.0
-      points_per_second: 90000
+      points_per_second: 900000

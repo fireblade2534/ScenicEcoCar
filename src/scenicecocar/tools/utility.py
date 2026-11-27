@@ -7,6 +7,7 @@ import scenic.core.scenarios
 import scenic.core.simulators
 import scenic.core.errors as errors
 from datetime import timedelta
+from scenic.core.errors import InvalidScenarioError
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +60,52 @@ def is_passed_type(name: str) -> bool:
         return True
     return False
 
+def validateTestRecords(scenerio: scenic.core.scenarios.Scenario) -> bool:
+    failed_seen = set()
+    passed_seen = set()
+
+    # Both of the records are allowed to be finals
+    for record in scenerio.recordedFinalExprs:
+        if is_passed_type(record.name) == True:
+            if record.name in passed_seen:
+                raise InvalidScenarioError(f"Only one `{record.name}` record final is allowed")
+            passed_seen.add(record.name)
+
+        if is_failed_type(record.name) == True:
+            if record.name in failed_seen:
+                raise InvalidScenarioError(f"Only one `{record.name}` record final is allowed")
+            failed_seen.add(record.name)
+    
+    if len(passed_seen) == 0:
+        raise InvalidScenarioError("A `PASSED` record final is required")
+
+    # The failed records are allowed to be lists while the passed record can only be a final
+    for record in scenerio.recordedExprs:
+        if is_passed_type(record.name) == True:
+            raise InvalidScenarioError(f"The `{record.name}` record can only be a record final")
+
+        if is_failed_type(record.name) == True:
+            if record.name in failed_seen:
+                raise InvalidScenarioError(f"Only one `{record.name}` record is allowed")
+            failed_seen.add(record.name)
+
+    # Neither of the records is allowed to be an inital
+    for record in scenerio.recordedInitialExprs:
+        if is_passed_type(record.name) == True:
+            raise InvalidScenarioError(f"The `{record.name}` record can only be a record final")
+
+        if is_failed_type(record.name) == True:
+            raise InvalidScenarioError(f"The `{record.name}` record cannot be a record initial")
+        
+    return True
+
 def check_pass(simulation: scenic.core.simulators.Simulation) -> tuple[SimulationResultType, list[str], list[str]]:
     passed = []
     failed = []
 
     for key, record in simulation.result.records.items():
         if is_passed_type(key) == True:
+            # For passed only single bools are allowed
             if type(record) is not bool:
                 raise RuntimeError(
                     f"record `{key}` contains {record!r} ({type(record).__name__}), expected bool"
@@ -74,6 +115,7 @@ def check_pass(simulation: scenic.core.simulators.Simulation) -> tuple[Simulatio
                 passed.append(key)
 
         elif is_failed_type(key) == True:
+            # For failed either a single bool or a list of booleans is allowed
             if type(record) is bool:
                 if record == True:
                     failed.append(key)
@@ -93,7 +135,7 @@ def check_pass(simulation: scenic.core.simulators.Simulation) -> tuple[Simulatio
                     f"record `{key}` contains {record!r} ({type(record).__name__}), expected bool"
                 )
 
-
+    # If any failed records are true the sim fails regardless of if there are any passed records
     if len(passed) == 0 or len(failed) > 0:
         return (SimulationResultType.FAILED, passed, failed)
     
