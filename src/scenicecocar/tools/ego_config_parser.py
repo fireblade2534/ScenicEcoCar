@@ -41,12 +41,12 @@ def parse_ego_config(path: str) -> list[GenericSensor]:
                 sensor_name,
                 sensor_config["type"],
                 offset = [
-                    float(position.get("y", 0.0)),
+                    float(position.get("y", 0.0)), # Swap y and x to compensate for scenic inverting y and x as the sensor format here is in carla coordinates
                     float(position.get("x", 0.0)),
                     float(position.get("z", 0.0))
                 ],
                 rotation = [
-                    float(rotation.get("yaw", 0.0)), # Invert yaw and pitch to compensate for scenic inverting yaw and pitch
+                    float(rotation.get("yaw", 0.0)), # Swap yaw and pitch to compensate for scenic inverting yaw and pitch as the sensor format here is in carla coordinates
                     float(rotation.get("pitch", 0.0)),
                     float(rotation.get("roll", 0.0))
                 ],

@@ -330,7 +330,7 @@ def run_command(args: argparse.Namespace) -> int:
             "Scenes:"
         ]
 
-        # Output either a default 
+        # Output either a detailed report or a simple report and filter if requested
         for item in scene_results:
             if args.filter_report and item['result'].lower() not in args.report_groups:
                 continue

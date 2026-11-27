@@ -32,6 +32,7 @@ class Recorder(Node):
         self.writer = None
         self.file_complete = False
 
+        # Setup timers for discovering new topics and ensuring keep alive pings
         self.steady_clock = Clock(clock_type = ClockType.STEADY_TIME)
         self.discover_timer = self.create_timer(0.1, self.discover, clock = self.steady_clock)
         self.keep_alive_timer = self.create_timer(0.2, self.keep_alive, clock = self.steady_clock)
@@ -109,6 +110,7 @@ class Recorder(Node):
             if os.path.isdir(self.bag_path):
                 shutil.rmtree(self.bag_path)
 
+            # Configure rosbag2 to handle the recording and writing to a mcap file
             self.writer = rosbag2_py.SequentialWriter()
             self.writer.open(
                 rosbag2_py.StorageOptions(
@@ -127,6 +129,7 @@ class Recorder(Node):
 
             timestamp = self.get_clock().now().nanoseconds
 
+            # Check if a topic is registered in the mcap file and register it if its not
             if topic not in self.registered:
                 self.writer.create_topic(
                     rosbag2_py.TopicMetadata(
@@ -222,6 +225,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(node.status())
             
             elif self.path == "/recording":
+                # Copy the mcap file over the network to a client (This does not validate the file at all)
                 path = node.completed_file()
                 with open(path, "rb") as file:
                     self.send_response(200)

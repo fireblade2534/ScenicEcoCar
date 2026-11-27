@@ -1,10 +1,13 @@
 import json
+import logging
 import os
 import shutil
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from scenicecocar.tools.ego_config_parser import GenericSensor
+
+logger = logging.getLogger(__name__)
 
 CARLA_SENSOR_TOPICS: dict[str, list[tuple[str, str]]] = {
     "sensor.camera.rgb": [
@@ -110,15 +113,18 @@ class ROSRecorder:
             raise RuntimeError(E.read().decode()) from E
 
     def precreate_sensor_topics(self, sensors: list[GenericSensor], parent_name: str = "hero"):
+        """Precreate sensor topics so that data can be immediately received rather then having to wait for discovery"""
         topics = {}
         channel_count = 0
 
         for sensor in sensors:
             if sensor.blueprint not in CARLA_SENSOR_TOPICS:
+                logger.warning(f"Unknown sensor blueprint marked for topic precreation: {sensor.blueprint}")
                 continue
 
             base = f"/carla/{parent_name}/{sensor.name}"
 
+            # Record all of the topics that a sensor will publish
             for (sufix, topic_format) in CARLA_SENSOR_TOPICS[sensor.blueprint]:
                 full_topic = base if sufix == "" else f"{base}/{sufix}"
                 topics[full_topic] = topic_format
@@ -142,6 +148,7 @@ class ROSRecorder:
             return json.load(response)
 
     def save(self, path: str):
+        # Copy the latest mcap file over the network to the output file (This does not validate the file at all beyond expected size)
         with urlopen(self.url + "/recording", timeout = 120) as response:
             with open(path, "wb") as file:
                 shutil.copyfileobj(response, file, length = 1024 * 1024)

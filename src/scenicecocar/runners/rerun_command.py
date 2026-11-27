@@ -87,6 +87,7 @@ def rerun_command(args: argparse.Namespace) -> int:
                 total_time = time.time() - start_time
                 logging.debug(f"Ran simulation for scene {scene_count} in {total_time:.4g} seconds")
 
+                # Update the simulation counts
                 if simulation_result != SimulationResultType.INVALID:
                     generation_success_count += 1
                     if simulation_result == SimulationResultType.PASSED:
@@ -96,6 +97,7 @@ def rerun_command(args: argparse.Namespace) -> int:
                 else:
                     invalid_count += 1
 
+                # Update metadata
                 scene_results.append(
                     {
                         "index": index,
@@ -109,6 +111,7 @@ def rerun_command(args: argparse.Namespace) -> int:
                     }
                 )
 
+                # Show a progress bar
                 remaining_time = ((time.time() - loop_start_time) / index) * (total_scenes - index)
                 logging.info(
                     f"[{index}/{total_scenes}] Scene {scene_count:03d} ({sub_index}/{repeat}) | P = {passed_count:03d} F = {failed_count:03d} I = {invalid_count:03d} | ETA {format_time(max(0, remaining_time))} "
@@ -125,6 +128,7 @@ def rerun_command(args: argparse.Namespace) -> int:
             passed_rate = 0.0
             failed_rate = 0.0
 
+        # Construct the report a list of individual lines
         report_text = [
             "=" * 40,
             "Scenic Test Report",
@@ -140,6 +144,7 @@ def rerun_command(args: argparse.Namespace) -> int:
             "Scenes:"
         ]
 
+        # Output either a detailed report or a simple report
         for item in scene_results:
             if args.detailed_report == True:
                 report_text += [

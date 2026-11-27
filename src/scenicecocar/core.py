@@ -378,12 +378,12 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
+    # Configure basic logging and scenic
     logging.basicConfig(
         level = getattr(logging, args.log_level),
         format = "%(asctime)s | %(levelname)-8s | %(message)s",
         datefmt = "%Y-%m-%d %H:%M:%S"
     )
-
     scenic.setDebuggingOptions(
         verbosity = args.verbosity,
     )
@@ -392,8 +392,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         return run_command(args)
-
-    if args.command == "rerun":
+    elif args.command == "rerun":
         return rerun_command(args)
 
     return 2
